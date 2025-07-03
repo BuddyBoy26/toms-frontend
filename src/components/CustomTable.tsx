@@ -9,14 +9,14 @@ export interface Column<T> {
   header: string
 }
 
-interface CustomTableProps<T extends Record<string, any>> {
+interface CustomTableProps<T extends object> {
   data: T[]
   columns: Column<T>[]
   idField: keyof T
   linkPrefix: string
 }
 
-export default function CustomTable<T extends Record<string, any>>({
+export default function CustomTable<T extends object>({
   data,
   columns,
   idField,

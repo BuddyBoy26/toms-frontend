@@ -40,7 +40,7 @@ export async function login(email: string, password: string) {
 export async function getCurrentUser() {
   const token = localStorage.getItem('kkabbas_token')
   if (!token) throw new Error('Not authenticated')
-  const res = await fetch(`${API_BASE}/users/me`, {
+  const res = await fetch(`${API_BASE}/user/me`, {
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${token}`,

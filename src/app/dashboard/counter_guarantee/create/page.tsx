@@ -4,8 +4,8 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
-const GuaranteeTypes = ['TBG', 'PBG', 'MPG']
-const PendingStatuses = [
+const TYPE_OPTIONS = ['TBG', 'PBG', 'MPG']
+const STATUS_OPTIONS = [
   'NOT Issued',
   'Issued / Extended',
   'Extension Required',
@@ -17,14 +17,14 @@ export default function CreateCounterGuaranteePage() {
   const router = useRouter()
   const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
 
-  const [type, setType] = useState(GuaranteeTypes[0])
-  const [ref, setRef] = useState('')
+  const [type, setType] = useState(TYPE_OPTIONS[0])
+  const [refNumber, setRefNumber] = useState('')
   const [date, setDate] = useState('')
-  const [bank, setBank] = useState('')
+  const [issuingBank, setIssuingBank] = useState('')
   const [expiry, setExpiry] = useState('')
-  const [release, setRelease] = useState('')
+  const [releaseBankDate, setReleaseBankDate] = useState('')
   const [remarks, setRemarks] = useState('')
-  const [status, setStatus] = useState(PendingStatuses[0])
+  const [status, setStatus] = useState(STATUS_OPTIONS[0])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -32,22 +32,23 @@ export default function CreateCounterGuaranteePage() {
     e.preventDefault()
     setError(null)
     setSaving(true)
-    const res = await fetch(`${API}/counter_guarantees`, {
+    const payload = {
+      guarantee_type: type,
+      guarantee_ref_number: refNumber,
+      cg_date: date,
+      issuing_bank: issuingBank || null,
+      expiry_date: expiry,
+      release_date_bank: releaseBankDate || null,
+      remarks: remarks || null,
+      pending_status: status,
+    }
+    const res = await fetch(`${API}/counter_guarantee`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}`,
       },
-      body: JSON.stringify({
-        guarantee_type: type,
-        guarantee_ref_number: ref,
-        cg_date: date,
-        issuing_bank: bank || null,
-        expiry_date: expiry,
-        release_date_bank: release || null,
-        remarks: remarks || null,
-        pending_status: status,
-      }),
+      body: JSON.stringify(payload),
     })
     setSaving(false)
     if (!res.ok) {
@@ -59,32 +60,30 @@ export default function CreateCounterGuaranteePage() {
   }
 
   return (
-    <div className="max-w-lg">
-      <h1 className="text-2xl font-bold mb-4">Create Counter Guarantee</h1>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="max-w-lg p-8">
+      <h1 className="text-2xl font-bold mb-6">Create Counter Guarantee</h1>
+      <form onSubmit={handleSubmit} className="space-y-6">
         {error && <p className="text-red-600">{error}</p>}
 
         <div>
-          <label className="block text-sm font-medium">Type</label>
+          <label className="block text-sm font-medium">Guarantee Type</label>
           <select
+            className="mt-1 w-full px-3 py-2 border rounded-md"
             value={type}
             onChange={e => setType(e.target.value)}
-            className="mt-1 w-full px-3 py-2 border rounded-md"
-            required
           >
-            {GuaranteeTypes.map(gt => (
-              <option key={gt} value={gt}>{gt}</option>
+            {TYPE_OPTIONS.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium">Reference #</label>
+          <label className="block text-sm font-medium">Reference Number</label>
           <input
-            type="text"
-            value={ref}
-            onChange={e => setRef(e.target.value)}
             className="mt-1 w-full px-3 py-2 border rounded-md"
+            value={refNumber}
+            onChange={e => setRefNumber(e.target.value)}
             required
           />
         </div>
@@ -94,19 +93,19 @@ export default function CreateCounterGuaranteePage() {
             <label className="block text-sm font-medium">Date</label>
             <input
               type="date"
+              className="mt-1 w-full px-3 py-2 border rounded-md"
               value={date}
               onChange={e => setDate(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border rounded-md"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium">Expiry</label>
+            <label className="block text-sm font-medium">Expiry Date</label>
             <input
               type="date"
+              className="mt-1 w-full px-3 py-2 border rounded-md"
               value={expiry}
               onChange={e => setExpiry(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border rounded-md"
               required
             />
           </div>
@@ -115,33 +114,31 @@ export default function CreateCounterGuaranteePage() {
         <div>
           <label className="block text-sm font-medium">Issuing Bank</label>
           <input
-            type="text"
-            value={bank}
-            onChange={e => setBank(e.target.value)}
             className="mt-1 w-full px-3 py-2 border rounded-md"
+            value={issuingBank}
+            onChange={e => setIssuingBank(e.target.value)}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium">Release Date</label>
+          <label className="block text-sm font-medium">Release Date (Bank)</label>
           <input
             type="date"
-            value={release}
-            onChange={e => setRelease(e.target.value)}
             className="mt-1 w-full px-3 py-2 border rounded-md"
+            value={releaseBankDate}
+            onChange={e => setReleaseBankDate(e.target.value)}
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium">Pending Status</label>
           <select
+            className="mt-1 w-full px-3 py-2 border rounded-md"
             value={status}
             onChange={e => setStatus(e.target.value)}
-            className="mt-1 w-full px-3 py-2 border rounded-md"
-            required
           >
-            {PendingStatuses.map(ps => (
-              <option key={ps} value={ps}>{ps}</option>
+            {STATUS_OPTIONS.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
         </div>
@@ -150,18 +147,18 @@ export default function CreateCounterGuaranteePage() {
           <label className="block text-sm font-medium">Remarks</label>
           <textarea
             rows={3}
+            className="mt-1 w-full px-3 py-2 border rounded-md"
             value={remarks}
             onChange={e => setRemarks(e.target.value)}
-            className="mt-1 w-full px-3 py-2 border rounded-md"
           />
         </div>
 
         <button
           type="submit"
           disabled={saving}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+          className="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
         >
-          {saving ? 'Saving…' : 'Create'}
+          {saving ? 'Creating…' : 'Create'}
         </button>
       </form>
     </div>

@@ -4,8 +4,8 @@
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
-const GuaranteeTypes = ['TBG', 'PBG', 'MPG']
-const PendingStatuses = [
+const TYPE_OPTIONS = ['TBG', 'PBG', 'MPG']
+const STATUS_OPTIONS = [
   'NOT Issued',
   'Issued / Extended',
   'Extension Required',
@@ -13,68 +13,89 @@ const PendingStatuses = [
   'Released',
 ]
 
+interface CG {
+  cg_id: number
+  guarantee_type: string
+  guarantee_ref_number: string
+  cg_date: string
+  issuing_bank: string | null
+  expiry_date: string
+  release_date_bank: string | null
+  remarks: string | null
+  pending_status: string
+}
+
 export default function CounterGuaranteeDetailPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
   const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
 
+  const [item, setItem] = useState<CG | null>(null)
+  const [type, setType] = useState(TYPE_OPTIONS[0])
+  const [refNumber, setRefNumber] = useState('')
+  const [date, setDate] = useState('')
+  const [issuingBank, setIssuingBank] = useState('')
+  const [expiry, setExpiry] = useState('')
+  const [releaseBankDate, setReleaseBankDate] = useState('')
+  const [status, setStatus] = useState(STATUS_OPTIONS[0])
+  const [remarks, setRemarks] = useState('')
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [item, setItem] = useState<any>(null)
-  const [type, setType] = useState('')
-  const [ref, setRef] = useState('')
-  const [date, setDate] = useState('')
-  const [bank, setBank] = useState('')
-  const [expiry, setExpiry] = useState('')
-  const [release, setRelease] = useState('')
-  const [remarks, setRemarks] = useState('')
-  const [status, setStatus] = useState('')
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`${API}/counter_guarantees/${id}`, {
+    fetch(`${API}/counter_guarantee/${id}`, {
       headers: { Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}` },
     })
       .then(res => res.json())
-      .then(data => {
+      .then((data: CG) => {
         setItem(data)
         setType(data.guarantee_type)
-        setRef(data.guarantee_ref_number)
+        setRefNumber(data.guarantee_ref_number)
         setDate(data.cg_date)
-        setBank(data.issuing_bank || '')
+        setIssuingBank(data.issuing_bank || '')
         setExpiry(data.expiry_date)
-        setRelease(data.release_date_bank || '')
-        setRemarks(data.remarks || '')
+        setReleaseBankDate(data.release_date_bank || '')
         setStatus(data.pending_status)
+        setRemarks(data.remarks || '')
       })
+      .catch(() => setError('Failed to load'))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [API, id])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError(null)
     setSaving(true)
-    await fetch(`${API}/counter_guarantees/${id}`, {
+    const payload = {
+      guarantee_type: type,
+      guarantee_ref_number: refNumber,
+      cg_date: date,
+      issuing_bank: issuingBank || null,
+      expiry_date: expiry,
+      release_date_bank: releaseBankDate || null,
+      remarks: remarks || null,
+      pending_status: status,
+    }
+    const res = await fetch(`${API}/counter_guarantee/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}`,
       },
-      body: JSON.stringify({
-        guarantee_type: type,
-        guarantee_ref_number: ref,
-        cg_date: date,
-        issuing_bank: bank || null,
-        expiry_date: expiry,
-        release_date_bank: release || null,
-        remarks: remarks || null,
-        pending_status: status,
-      }),
+      body: JSON.stringify(payload),
     })
     setSaving(false)
+    if (!res.ok) {
+      const err = await res.json().catch(() => null)
+      setError(err?.detail || 'Failed to save')
+    }
   }
 
   const handleDelete = async () => {
-    if (!confirm('Delete this record?')) return
-    await fetch(`${API}/counter_guarantees/${id}`, {
+    if (!confirm('Delete this counter guarantee?')) return
+    await fetch(`${API}/counter_guarantee/${id}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}` },
     })
@@ -82,33 +103,33 @@ export default function CounterGuaranteeDetailPage() {
   }
 
   if (loading) return <p>Loading…</p>
-  if (!item) return <p>Not found.</p>
+  if (!item) return <p className="text-red-600">Not found.</p>
 
   return (
-    <div className="max-w-lg">
-      <h1 className="text-2xl font-bold mb-4">CounterGuarantee #{id}</h1>
-      <form onSubmit={handleSave} className="space-y-4">
+    <div className="max-w-lg p-8">
+      <h1 className="text-2xl font-bold mb-6">Edit Counter Guarantee #{item.cg_id}</h1>
+      <form onSubmit={handleSave} className="space-y-6">
+        {error && <p className="text-red-600">{error}</p>}
+
         <div>
-          <label className="block text-sm font-medium">Type</label>
+          <label className="block text-sm font-medium">Guarantee Type</label>
           <select
+            className="mt-1 w-full px-3 py-2 border rounded-md"
             value={type}
             onChange={e => setType(e.target.value)}
-            className="mt-1 w-full px-3 py-2 border rounded-md"
-            required
           >
-            {GuaranteeTypes.map(gt => (
-              <option key={gt} value={gt}>{gt}</option>
+            {TYPE_OPTIONS.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
         </div>
 
         <div>
-          <label className="block text-sm font-medium">Reference #</label>
+          <label className="block text-sm font-medium">Reference Number</label>
           <input
-            type="text"
-            value={ref}
-            onChange={e => setRef(e.target.value)}
             className="mt-1 w-full px-3 py-2 border rounded-md"
+            value={refNumber}
+            onChange={e => setRefNumber(e.target.value)}
             required
           />
         </div>
@@ -118,19 +139,19 @@ export default function CounterGuaranteeDetailPage() {
             <label className="block text-sm font-medium">Date</label>
             <input
               type="date"
+              className="mt-1 w-full px-3 py-2 border rounded-md"
               value={date}
               onChange={e => setDate(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border rounded-md"
               required
             />
           </div>
           <div>
-            <label className="block text-sm font-medium">Expiry</label>
+            <label className="block text-sm font-medium">Expiry Date</label>
             <input
               type="date"
+              className="mt-1 w-full px-3 py-2 border rounded-md"
               value={expiry}
               onChange={e => setExpiry(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border rounded-md"
               required
             />
           </div>
@@ -139,33 +160,31 @@ export default function CounterGuaranteeDetailPage() {
         <div>
           <label className="block text-sm font-medium">Issuing Bank</label>
           <input
-            type="text"
-            value={bank}
-            onChange={e => setBank(e.target.value)}
             className="mt-1 w-full px-3 py-2 border rounded-md"
+            value={issuingBank}
+            onChange={e => setIssuingBank(e.target.value)}
           />
         </div>
 
         <div>
-          <label className="block text-sm font-medium">Release Date</label>
+          <label className="block text-sm font-medium">Release Date (Bank)</label>
           <input
             type="date"
-            value={release}
-            onChange={e => setRelease(e.target.value)}
             className="mt-1 w-full px-3 py-2 border rounded-md"
+            value={releaseBankDate}
+            onChange={e => setReleaseBankDate(e.target.value)}
           />
         </div>
 
         <div>
           <label className="block text-sm font-medium">Pending Status</label>
           <select
+            className="mt-1 w-full px-3 py-2 border rounded-md"
             value={status}
             onChange={e => setStatus(e.target.value)}
-            className="mt-1 w-full px-3 py-2 border rounded-md"
-            required
           >
-            {PendingStatuses.map(ps => (
-              <option key={ps} value={ps}>{ps}</option>
+            {STATUS_OPTIONS.map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
             ))}
           </select>
         </div>
@@ -174,24 +193,24 @@ export default function CounterGuaranteeDetailPage() {
           <label className="block text-sm font-medium">Remarks</label>
           <textarea
             rows={3}
+            className="mt-1 w-full px-3 py-2 border rounded-md"
             value={remarks}
             onChange={e => setRemarks(e.target.value)}
-            className="mt-1 w-full px-3 py-2 border rounded-md"
           />
         </div>
 
-        <div className="flex space-x-2">
+        <div className="flex space-x-4">
           <button
             type="submit"
             disabled={saving}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            className="flex-1 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
           >
             {saving ? 'Saving…' : 'Save'}
           </button>
           <button
             type="button"
             onClick={handleDelete}
-            className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            className="flex-1 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition"
           >
             Delete
           </button>
