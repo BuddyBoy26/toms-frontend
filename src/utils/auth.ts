@@ -1,5 +1,5 @@
 // /utils/auth.ts
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
 
 interface TokenResponse {
   access_token: string
