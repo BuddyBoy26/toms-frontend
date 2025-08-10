@@ -8,6 +8,7 @@ export default function RegisterPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [fullName, setFullName] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,6 +31,19 @@ export default function RegisterPage() {
       <div className="max-w-md w-full bg-white p-8 rounded-2xl shadow">
         <h1 className="text-2xl font-bold text-center mb-6">KK Abbas Portal</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="full_name" className="block text-sm font-medium">
+              Full Name
+            </label>
+            <input
+              id="full_name"
+              type="text"
+              required
+              value={fullName}
+              onChange={e => setFullName(e.target.value)}
+              className="mt-1 w-full px-3 py-2 border rounded-md focus:outline-none focus:ring"
+            />
+          </div>
           <div>
             <label htmlFor="email" className="block text-sm font-medium">
               Email

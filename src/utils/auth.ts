@@ -1,5 +1,6 @@
 // /utils/auth.ts
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
+import { BACKEND_API_URL } from '../constants/apiConstants'
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || BACKEND_API_URL
 
 interface TokenResponse {
   access_token: string
