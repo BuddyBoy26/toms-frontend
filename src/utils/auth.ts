@@ -7,11 +7,11 @@ interface TokenResponse {
   token_type: 'bearer'
 }
 
-export async function register(email: string, password: string) {
+export async function register(full_name: string, email: string, password: string) {
   const res = await fetch(`${API_BASE}/auth/users/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ full_name, email, password }),
   })
   if (!res.ok) {
     const err = await res.json()

@@ -22,14 +22,13 @@ export default function ProductListPage() {
       headers: { Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}` },
     })
       .then(res => res.json())
-      .then((data: Product[]) => setProducts(data))
+      .then((data: Product[]) => setProducts(data.sort((a, b) => a.product_id - b.product_id)))
       .finally(() => setLoading(false))
   }, [])
 
   const columns: Column<Product>[] = [
     { key: 'product_id', header: 'ID' },
     { key: 'product_name', header: 'Product Name' },
-    { key: 'company_id', header: 'Company ID' },
   ]
 
   return (

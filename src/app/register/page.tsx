@@ -15,7 +15,7 @@ export default function RegisterPage() {
     e.preventDefault()
     setError(null)
     try {
-      await register(email, password)
+      await register(fullName, email, password)
       router.push('/')
     } catch (err: unknown) {
       if (err instanceof Error) {

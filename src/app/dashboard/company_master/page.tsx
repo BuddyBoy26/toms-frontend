@@ -28,9 +28,6 @@ export default function CompanyListPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  if (loading) return <p>Loading companies…</p>
-  if (!companies.length) return <p>No companies found.</p>
-
   const columns: Column<Company>[] = [
     { key: 'company_id', header: 'ID' },
     { key: 'company_name', header: 'Name' },
@@ -50,12 +47,18 @@ export default function CompanyListPage() {
         </button>
       </div>
 
-      <CustomTable
-        data={companies}
-        columns={columns}
-        idField="company_id"
-        linkPrefix="/dashboard/company_master"
-      />
+      {loading ? (
+              <p>Loading companies...</p>
+            ) : companies.length > 0 ? (
+              <CustomTable
+                data={companies}
+                columns={columns}
+                idField="company_id"
+                linkPrefix="/dashboard/company_master"
+              />
+            ) : (
+              <p className="text-gray-600">No companies found.</p>
+            )}
     </div>
   )
 }

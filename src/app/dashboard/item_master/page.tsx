@@ -1,4 +1,3 @@
-// src/app/dashboard/item_master/page.tsx
 'use client'
 
 import { useEffect, useState } from 'react'
@@ -9,29 +8,52 @@ interface Item {
   item_id: number
   product_id: number
   item_description: string
-  hs_code: string
+  hs_code: string | null
+}
+
+interface Product {
+  product_id: number
+  product_name: string
+}
+
+interface ItemWithProduct extends Item {
+  product_name: string
 }
 
 export default function ItemListPage() {
   const router = useRouter()
-  const [items, setItems] = useState<Item[]>([])
+  const [items, setItems] = useState<ItemWithProduct[]>([])
   const [loading, setLoading] = useState(true)
   const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
 
   useEffect(() => {
-    fetch(`${API}/item_master`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}` },
-    })
-      .then(res => res.json())
-      .then((data: Item[]) => setItems(data))
+    Promise.all([
+      fetch(`${API}/item_master`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}` },
+      }).then(res => res.json()),
+      fetch(`${API}/product_master`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}` },
+      }).then(res => res.json()),
+    ])
+      .then(([itemsData, productsData]: [Item[], Product[]]) => {
+        const merged = itemsData.map(item => {
+          const product = productsData.find(p => p.product_id === item.product_id)
+          return {
+            ...item,
+            product_name: product ? product.product_name : 'Unknown',
+          }
+        })
+        setItems(merged)
+      })
       .finally(() => setLoading(false))
   }, [API])
 
-  const columns: Column<Item>[] = [
+  const columns: Column<ItemWithProduct>[] = [
     { key: 'item_id', header: 'ID' },
+    { key: 'product_name', header: 'Product Name' },
     { key: 'item_description', header: 'Description' },
     { key: 'hs_code', header: 'HS Code' },
-    { key: 'product_id', header: 'Product ID' },
+     // swapped out product_id
   ]
 
   return (

@@ -3,292 +3,261 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import toast from 'react-hot-toast'
 
 interface Order { order_id: number; po_number: string }
-interface Status { value: string }
 
-const STATUS_OPTIONS: Status[] = [
-  { value: 'NOT Issued' },
-  { value: 'Issued / Extended' },
-  { value: 'Extension Required' },
-  { value: 'NOT Released' },
-  { value: 'Released' },
-]
+type PBGStatus =
+  | 'NOT Issued'
+  | 'Issued / Extended'
+  | 'Extension Required'
+  | 'NOT Released'
+  | 'Released'
 
-export default function CreatePGPage() {
+function coerceArray<T>(raw: unknown): T[] {
+  if (Array.isArray(raw)) return raw as T[]
+  if (raw && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>
+    if (Array.isArray(obj.items)) return obj.items as T[]
+    if (Array.isArray(obj.data)) return obj.data as T[]
+    if (Array.isArray(obj.results)) return obj.results as T[]
+    if (Array.isArray(obj.records)) return obj.records as T[]
+    if (Array.isArray(obj.rows)) return obj.rows as T[]
+    if (Array.isArray(obj.orders)) return obj.orders as T[]
+    if (Array.isArray(obj.order_details)) return obj.order_details as T[]
+    if (Array.isArray(obj.order_detail)) return obj.order_detail as T[]
+  }
+  return []
+}
+
+export default function CreatePerformanceGuaranteePage() {
   const router = useRouter()
   const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
 
-  const [orderNo, setOrderNo] = useState('')
+  const [orders, setOrders] = useState<Order[] | null>([]) // keep null for extra safety
+
+  const [orderId, setOrderId] = useState<number | ''>('')
+
   const [pgNo, setPgNo] = useState('')
-  const [issuingBank, setIssuingBank] = useState('')
-  const [depositReceipt, setDepositReceipt] = useState('')
+  const [pgIssuingBank, setPgIssuingBank] = useState('')
+  const [pgDepositReceiptNo, setPgDepositReceiptNo] = useState('')
   const [chequeNo, setChequeNo] = useState('')
   const [ttDate, setTtDate] = useState('')
-  const [docDate, setDocDate] = useState('')
-  const [value, setValue] = useState('')
-  const [expiryDate, setExpiryDate] = useState('')
-  const [submittedDate, setSubmittedDate] = useState('')
-  const [returnDate, setReturnDate] = useState('')
-  const [releaseDewa, setReleaseDewa] = useState('')
-  const [releaseBank, setReleaseBank] = useState('')
-  const [extensionDates, setExtensionDates] = useState('')
+  const [documentDate, setDocumentDate] = useState('')
+  const [pgValue, setPgValue] = useState('') // required number
+  const [pgExpiryDate, setPgExpiryDate] = useState('') // required date
+  const [pgSubmittedDate, setPgSubmittedDate] = useState('')
+  const [pgReturnDate, setPgReturnDate] = useState('')
+  const [pgReleaseDateDewa, setPgReleaseDateDewa] = useState('')
+  const [pgReleaseDateBank, setPgReleaseDateBank] = useState('')
+
+  const [extensionDateInput, setExtensionDateInput] = useState('')
+  const [pgExtensionDates, setPgExtensionDates] = useState<string[]>([])
+
   const [remarks, setRemarks] = useState('')
-  const [status, setStatus] = useState(STATUS_OPTIONS[0].value)
+  const [pendingStatus, setPendingStatus] = useState<PBGStatus>('NOT Issued')
 
-  const [orders, setOrders] = useState<Order[]>([])
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string|null>(null)
-
-  const parseDates = (txt: string) =>
-    txt.split(',').map(s => s.trim()).filter(Boolean)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`${API}/order_detail`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}` },
-    })
-      .then(r => r.json())
-      .then((data: Order[]) => setOrders(data))
-      .catch(() => setError('Failed to load orders'))
+    const token = localStorage.getItem('kkabbas_token') || ''
+    fetch(`${API}/order_detail`, { headers:{ Authorization:`Bearer ${token}` } })
+      .then(async r => {
+        const raw = await r.json().catch(() => null)
+        const arr = coerceArray<Order>(raw)
+        if (!Array.isArray(arr)) console.warn('Unexpected /order_detail shape:', raw)
+        setOrders(arr)
+      })
+      .catch(()=>{
+        setError('Failed to load orders')
+        setOrders([]) // ensure array fallback
+      })
   }, [API])
+
+  const addExtensionDate = () => {
+    if (!extensionDateInput) return
+    if (pgExtensionDates.includes(extensionDateInput)) return
+    setPgExtensionDates(prev => [...prev, extensionDateInput].sort())
+    setExtensionDateInput('')
+  }
+  const removeExtensionDate = (d: string) => {
+    setPgExtensionDates(prev => prev.filter(x=>x!==d))
+  }
+  const toNum = (s: string) => {
+    const n = parseFloat(s); return isNaN(n) ? null : n
+  }
+  const toNull = (s: string) => (s && s.trim() !== '' ? s.trim() : null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    if (!orderId) { toast.error('Select an Order'); return }
+    if (!pgNo.trim()) { toast.error('PG No is required'); return }
+    if (!pgValue || toNum(pgValue) === null) { toast.error('PG Value is required'); return }
+    if (!pgExpiryDate) { toast.error('PG Expiry Date is required'); return }
+
     setSaving(true)
-
-    const ord = orders.find(o => o.po_number === orderNo)
-    if (!ord) {
-      setError('Select a valid Order')
-      setSaving(false)
-      return
-    }
-
     const payload = {
-      order_id: ord.order_id,
-      pgNo,
-      pg_issuing_bank: issuingBank || null,
-      pg_deposit_receipt_no: depositReceipt || null,
-      cheque_no: chequeNo || null,
+      order_id: Number(orderId),
+      pg_no: pgNo.trim(),
+      pg_issuing_bank: toNull(pgIssuingBank),
+      pg_deposit_receipt_no: toNull(pgDepositReceiptNo),
+      cheque_no: toNull(chequeNo),
       tt_date: ttDate || null,
-      document_date: docDate || null,
-      pg_value: parseFloat(value),
-      pg_expiry_date: expiryDate,
-      pg_submitted_date: submittedDate || null,
-      pg_return_date: returnDate || null,
-      pg_release_date_dewa: releaseDewa || null,
-      pg_release_date_bank: releaseBank || null,
-      pg_extension_dates: extensionDates ? parseDates(extensionDates) : null,
-      remarks: remarks || null,
-      pending_status: status,
+      document_date: documentDate || null,
+      pg_value: toNum(pgValue),
+      pg_expiry_date: pgExpiryDate,
+      pg_submitted_date: pgSubmittedDate || null,
+      pg_return_date: pgReturnDate || null,
+      pg_release_date_dewa: pgReleaseDateDewa || null,
+      pg_release_date_bank: pgReleaseDateBank || null,
+      pg_extension_dates: pgExtensionDates.length ? pgExtensionDates : null,
+      remarks: toNull(remarks),
+      pending_status: pendingStatus,
     }
 
     const res = await fetch(`${API}/performance_guarantee`, {
       method: 'POST',
       headers: {
         'Content-Type':'application/json',
-        Authorization:`Bearer ${localStorage.getItem('kkabbas_token')}`
+        Authorization:`Bearer ${localStorage.getItem('kkabbas_token') || ''}`
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(payload)
     })
-
     setSaving(false)
+
     if (!res.ok) {
-      const err = await res.json().catch(() => null)
-      setError(err?.detail || 'Failed to create')
+      const err = await res.json().catch(()=>null)
+      const msg = err?.detail || 'Failed to create Performance Guarantee'
+      setError(msg)
+      toast.error(msg)
     } else {
+      toast.success('Performance Guarantee created')
       router.push('/dashboard/performance_guarantee')
     }
   }
 
+  const fieldCls = 'mt-1 w-full px-2 py-1 h-8 border rounded-md text-sm'
+  const labelCls = 'block text-xs font-medium'
+  const section3 = 'grid grid-cols-3 gap-3'
+  const orderOptions: Order[] = Array.isArray(orders) ? orders : [] // <— render-time guard
+
   return (
-    <div className="max-w-lg p-8">
-      <h1 className="text-2xl font-bold mb-6">Create Performance Guarantee</h1>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {error && <p className="text-red-600">{error}</p>}
+    <div className="max-w-6xl p-6">
+      <h1 className="text-xl font-semibold mb-4">Create Performance Guarantee</h1>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {error && <p className="text-red-600 text-sm">{error}</p>}
 
-        <div>
-          <label className="block text-sm font-medium">Order (PO#)</label>
-          <input
-            list="orders"
-            className="mt-1 w-full px-3 py-2 border rounded-md"
-            placeholder="Type to search…"
-            value={orderNo}
-            onChange={e => setOrderNo(e.target.value)}
-            required
-          />
-          <datalist id="orders">
-            {orders.map(o => (
-              <option key={o.order_id} value={o.po_number} />
-            ))}
-          </datalist>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium">PG No.</label>
-          <input
-            className="mt-1 w-full px-3 py-2 border rounded-md"
-            value={pgNo}
-            onChange={e => setPgNo(e.target.value)}
-            required
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
+        <div className={section3}>
           <div>
-            <label className="block text-sm font-medium">Issuing Bank</label>
-            <input
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={issuingBank}
-              onChange={e => setIssuingBank(e.target.value)}
-            />
+            <label className={labelCls}>Order</label>
+            <select className={fieldCls} value={orderId} onChange={e=>setOrderId(e.target.value ? Number(e.target.value) : '')} required>
+              <option value="">Select order</option>
+              {orderOptions.map(o => (
+                <option key={o.order_id} value={o.order_id}>{o.po_number}</option>
+              ))}
+            </select>
           </div>
           <div>
-            <label className="block text-sm font-medium">Deposit Receipt No.</label>
-            <input
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={depositReceipt}
-              onChange={e => setDepositReceipt(e.target.value)}
-            />
+            <label className={labelCls}>PG No</label>
+            <input type="text" className={fieldCls} value={pgNo} onChange={e=>setPgNo(e.target.value)} required />
+          </div>
+          <div>
+            <label className={labelCls}>Issuing Bank</label>
+            <input type="text" className={fieldCls} value={pgIssuingBank} onChange={e=>setPgIssuingBank(e.target.value)} />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className={section3}>
           <div>
-            <label className="block text-sm font-medium">Cheque No.</label>
-            <input
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={chequeNo}
-              onChange={e => setChequeNo(e.target.value)}
-            />
+            <label className={labelCls}>Deposit Receipt No</label>
+            <input type="text" className={fieldCls} value={pgDepositReceiptNo} onChange={e=>setPgDepositReceiptNo(e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium">TT Date</label>
-            <input
-              type="date"
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={ttDate}
-              onChange={e => setTtDate(e.target.value)}
-            />
+            <label className={labelCls}>Cheque No</label>
+            <input type="text" className={fieldCls} value={chequeNo} onChange={e=>setChequeNo(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>TT Date</label>
+            <input type="date" className={fieldCls} value={ttDate} onChange={e=>setTtDate(e.target.value)} />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className={section3}>
           <div>
-            <label className="block text-sm font-medium">Document Date</label>
-            <input
-              type="date"
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={docDate}
-              onChange={e => setDocDate(e.target.value)}
-            />
+            <label className={labelCls}>Document Date</label>
+            <input type="date" className={fieldCls} value={documentDate} onChange={e=>setDocumentDate(e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium">PG Value</label>
-            <input
-              type="number"
-              step="0.01"
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={value}
-              onChange={e => setValue(e.target.value)}
-              required
-            />
+            <label className={labelCls}>PG Value</label>
+            <input type="number" step="0.01" className={fieldCls} value={pgValue} onChange={e=>setPgValue(e.target.value)} required />
+          </div>
+          <div>
+            <label className={labelCls}>PG Expiry Date</label>
+            <input type="date" className={fieldCls} value={pgExpiryDate} onChange={e=>setPgExpiryDate(e.target.value)} required />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className={section3}>
           <div>
-            <label className="block text-sm font-medium">Expiry Date</label>
-            <input
-              type="date"
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={expiryDate}
-              onChange={e => setExpiryDate(e.target.value)}
-              required
-            />
+            <label className={labelCls}>PG Submitted Date</label>
+            <input type="date" className={fieldCls} value={pgSubmittedDate} onChange={e=>setPgSubmittedDate(e.target.value)} />
           </div>
           <div>
-            <label className="block text-sm font-medium">Submitted Date</label>
-            <input
-              type="date"
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={submittedDate}
-              onChange={e => setSubmittedDate(e.target.value)}
-            />
+            <label className={labelCls}>PG Return Date</label>
+            <input type="date" className={fieldCls} value={pgReturnDate} onChange={e=>setPgReturnDate(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>PG Release Date (DEWA)</label>
+            <input type="date" className={fieldCls} value={pgReleaseDateDewa} onChange={e=>setPgReleaseDateDewa(e.target.value)} />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className={section3}>
           <div>
-            <label className="block text-sm font-medium">Return Date</label>
-            <input
-              type="date"
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={returnDate}
-              onChange={e => setReturnDate(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Release Date (DEWA)</label>
-            <input
-              type="date"
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={releaseDewa}
-              onChange={e => setReleaseDewa(e.target.value)}
-            />
+            <label className={labelCls}>PG Release Date (Bank)</label>
+            <input type="date" className={fieldCls} value={pgReleaseDateBank} onChange={e=>setPgReleaseDateBank(e.target.value)} />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium">Release Date (Bank)</label>
-            <input
-              type="date"
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={releaseBank}
-              onChange={e => setReleaseBank(e.target.value)}
-            />
+        <div className="border rounded-md p-3">
+          <span className="text-xs font-medium text-gray-700">PG Extension Dates</span>
+          <div className="mt-2 flex gap-2">
+            <input type="date" className={fieldCls + ' max-w-xs'} value={extensionDateInput} onChange={e=>setExtensionDateInput(e.target.value)} />
+            <button type="button" onClick={addExtensionDate} className="px-3 h-8 bg-gray-800 text-white rounded-md text-sm">Add</button>
           </div>
+          {pgExtensionDates.length>0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {pgExtensionDates.map(d=>(
+                <span key={d} className="inline-flex items-center gap-2 px-2 h-7 rounded-full bg-gray-100 text-xs">
+                  {d}
+                  <button type="button" onClick={()=>removeExtensionDate(d)} className="text-gray-600 hover:text-red-600">×</button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className={section3}>
           <div>
-            <label className="block text-sm font-medium">Extension Dates (comma-separated)</label>
-            <input
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={extensionDates}
-              onChange={e => setExtensionDates(e.target.value)}
-            />
+            <label className={labelCls}>Pending Status</label>
+            <select className={fieldCls} value={pendingStatus} onChange={e=>setPendingStatus(e.target.value as PBGStatus)} required>
+              <option value="NOT Issued">NOT Issued</option>
+              <option value="Issued / Extended">Issued / Extended</option>
+              <option value="Extension Required">Extension Required</option>
+              <option value="NOT Released">NOT Released</option>
+              <option value="Released">Released</option>
+            </select>
+          </div>
+          <div className="col-span-2">
+            <label className={labelCls}>Remarks</label>
+            <textarea className="mt-1 w-full px-2 py-2 border rounded-md text-sm" rows={3} value={remarks} onChange={e=>setRemarks(e.target.value)} />
           </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-medium">Remarks</label>
-          <textarea
-            rows={3}
-            className="mt-1 w-full px-3 py-2 border rounded-md"
-            value={remarks}
-            onChange={e => setRemarks(e.target.value)}
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium">Pending Status</label>
-          <select
-            className="mt-1 w-full px-3 py-2 border rounded-md"
-            value={status}
-            onChange={e => setStatus(e.target.value)}
-          >
-            {STATUS_OPTIONS.map(s => (
-              <option key={s.value} value={s.value}>
-                {s.value}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-        >
+        <button type="submit" disabled={saving} className="w-full py-2 h-10 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
           {saving ? 'Creating…' : 'Create'}
         </button>
       </form>

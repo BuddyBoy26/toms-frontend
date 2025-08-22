@@ -1,294 +1,297 @@
-// src/app/dashboard/tendering_companies/create/page.tsx
 'use client'
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import toast from 'react-hot-toast'
 
-const CurrencyOptions = ['AED', 'EUR', 'USD']
-const StatusOptions = ['To be released', 'In effect', 'Released (By DEWA)']
+interface Company { company_id:number; company_name:string }
+interface Tender  { tender_id:number;  tender_no:string }
 
-interface Company {
-  company_id: number
-  company_name: string
-}
-interface Tender {
-  tender_id: number
-  tender_no: string
+type Currency = 'AED'|'EUR'|'USD'
+type PendingStatus = 'To be released' | 'In effect' | 'Released (By DEWA)'
+
+function coerceArray<T>(raw: unknown): T[] {
+  if (Array.isArray(raw)) return raw as T[]
+  if (raw && typeof raw === 'object') {
+    const obj = raw as Record<string, unknown>
+    if (Array.isArray(obj.items)) return obj.items as T[]
+    if (Array.isArray(obj.data)) return obj.data as T[]
+    if (Array.isArray(obj.results)) return obj.results as T[]
+    if (Array.isArray(obj.records)) return obj.records as T[]
+    if (Array.isArray(obj.rows)) return obj.rows as T[]
+  }
+  return []
 }
 
 export default function CreateTenderingCompanyPage() {
   const router = useRouter()
   const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
 
-  // required FK fields
-  const [companyId, setCompanyId] = useState('')
-  const [tenderId, setTenderId] = useState('')
-  // optional fields
-  const [receiptNo, setReceiptNo] = useState('')
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [tenders, setTenders] = useState<Tender[]>([])
+
+  // relationships
+  const [companyId, setCompanyId] = useState<number | ''>('')
+  const [tenderId, setTenderId] = useState<number | ''>('')
+
+  // fields
+  const [tenderReceiptNo, setTenderReceiptNo] = useState('')
   const [tbgNo, setTbgNo] = useState('')
-  const [tbgBank, setTbgBank] = useState('')
-  const [depositReceipt, setDepositReceipt] = useState('')
+  const [tbgIssuingBank, setTbgIssuingBank] = useState('')
+  const [tenderDepositReceiptNo, setTenderDepositReceiptNo] = useState('')
   const [chequeNo, setChequeNo] = useState('')
   const [ttRef, setTtRef] = useState('')
   const [ttDate, setTtDate] = useState('')
-  const [docDate, setDocDate] = useState('')
-  const [tbgValue, setTbgValue] = useState('')
-  const [tbgExpiry, setTbgExpiry] = useState('')
-  const [tbgSubmitted, setTbgSubmitted] = useState('')
-  const [tbgReleaseDewa, setTbgReleaseDewa] = useState('')
-  const [tbgReleaseBank, setTbgReleaseBank] = useState('')
-  const [extensionDates, setExtensionDates] = useState<string>('')
-  const [currency, setCurrency] = useState(CurrencyOptions[0])
-  const [discountPercent, setDiscountPercent] = useState('')
-  const [remarks, setRemarks] = useState('')
-  const [status, setStatus] = useState(StatusOptions[0])
+  const [documentDate, setDocumentDate] = useState('')
 
-  // dropdown data
-  const [companies, setCompanies] = useState<Company[]>([])
-  const [tenders, setTenders] = useState<Tender[]>([])
+  const [tbgValue, setTbgValue] = useState('') // number
+  const [tbgExpiryDate, setTbgExpiryDate] = useState('')
+  const [tbgSubmittedDate, setTbgSubmittedDate] = useState('')
+  const [tbgReleaseDateDewa, setTbgReleaseDateDewa] = useState('')
+  const [tbgReleaseDateBank, setTbgReleaseDateBank] = useState('')
+
+  const [extensionDateInput, setExtensionDateInput] = useState('')
+  const [tenderExtensionDates, setTenderExtensionDates] = useState<string[]>([])
+
+  const [tenderingCurrency, setTenderingCurrency] = useState<Currency>('AED')
+  const [discountPercent, setDiscountPercent] = useState('') // number
+  const [remarks, setRemarks] = useState('')
+
+  const [pendingStatus, setPendingStatus] = useState<PendingStatus>('To be released')
 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // fetch companies and tenders
-    fetch(`${API}/company_master`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}` },
-    })
-      .then(res => res.json())
-      .then((data: Company[]) => setCompanies(data))
-      .catch(() => setError('Failed to load companies'))
+    const token = localStorage.getItem('kkabbas_token') || ''
+    Promise.all([
+      fetch(`${API}/company_master`, { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.json()).catch(()=>null),
+      fetch(`${API}/tender`,         { headers:{ Authorization:`Bearer ${token}` }}).then(r=>r.json()).catch(()=>null),
+    ]).then(([compsRaw, tndsRaw])=>{
+      setCompanies(coerceArray<Company>(compsRaw))
+      setTenders(coerceArray<Tender>(tndsRaw))
+    }).catch(()=>setError('Failed to load dropdowns'))
+  },[API])
 
-    fetch(`${API}/tender`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}` },
-    })
-      .then(res => res.json())
-      .then((data: Tender[]) => setTenders(data))
-      .catch(() => setError('Failed to load tenders'))
-  }, [API])
+  const addExtensionDate = () => {
+    if (!extensionDateInput) return
+    if (tenderExtensionDates.includes(extensionDateInput)) return
+    setTenderExtensionDates(prev => [...prev, extensionDateInput].sort())
+    setExtensionDateInput('')
+  }
+  const removeExtensionDate = (d: string) => {
+    setTenderExtensionDates(prev => prev.filter(x=>x!==d))
+  }
 
-  const parseDatesArray = (text: string) =>
-    text
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean)
+  const toNumOrNull = (s: string) => {
+    const n = parseFloat(s)
+    return isNaN(n) ? null : n
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
-    setSaving(true)
 
+    if (!companyId) { toast.error('Select a Company'); return }
+    if (!tenderId)  { toast.error('Select a Tender');  return }
+
+    setSaving(true)
     const payload = {
-      company_id: parseInt(companyId, 10),
-      tender_id: parseInt(tenderId, 10),
-      tender_receipt_no: receiptNo || null,
-      tbg_no: tbgNo || null,
-      tbg_issuing_bank: tbgBank || null,
-      tender_deposit_receipt_no: depositReceipt || null,
-      cheque_no: chequeNo || null,
-      tt_ref: ttRef || null,
+      company_id: Number(companyId),
+      tender_id: Number(tenderId),
+
+      tender_receipt_no: tenderReceiptNo.trim() || null,
+      tbg_no: tbgNo.trim() || null,
+      tbg_issuing_bank: tbgIssuingBank.trim() || null,
+      tender_deposit_receipt_no: tenderDepositReceiptNo.trim() || null,
+      cheque_no: chequeNo.trim() || null,
+      tt_ref: ttRef.trim() || null,
       tt_date: ttDate || null,
-      document_date: docDate || null,
-      tbg_value: tbgValue ? parseFloat(tbgValue) : null,
-      tbg_expiry_date: tbgExpiry || null,
-      tbg_submitted_date: tbgSubmitted || null,
-      tbg_release_date_dewa: tbgReleaseDewa || null,
-      tbg_release_date_bank: tbgReleaseBank || null,
-      tender_extension_dates: extensionDates
-        ? parseDatesArray(extensionDates)
-        : null,
-      tendering_currency: currency,
-      discount_percent: discountPercent
-        ? parseFloat(discountPercent)
-        : null,
-      remarks: remarks || null,
-      pending_status: status,
+      document_date: documentDate || null,
+
+      tbg_value: toNumOrNull(tbgValue),
+      tbg_expiry_date: tbgExpiryDate || null,
+      tbg_submitted_date: tbgSubmittedDate || null,
+      tbg_release_date_dewa: tbgReleaseDateDewa || null,
+      tbg_release_date_bank: tbgReleaseDateBank || null,
+
+      tender_extension_dates: tenderExtensionDates.length ? tenderExtensionDates : null,
+
+      tendering_currency: tenderingCurrency,
+      discount_percent: toNumOrNull(discountPercent),
+      remarks: remarks.trim() || null,
+      pending_status: pendingStatus,
     }
 
-    const res = await fetch(`${API}/tendering_companies`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}`,
+    const res = await fetch(`${API}/tendering_companies`,{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        Authorization:`Bearer ${localStorage.getItem('kkabbas_token') || ''}`
       },
-      body: JSON.stringify(payload),
+      body:JSON.stringify(payload)
     })
-
     setSaving(false)
-    if (!res.ok) {
-      const err = await res.json().catch(() => null)
-      setError(err?.detail || 'Failed to create record')
+    if(!res.ok){
+      const err=await res.json().catch(()=>null)
+      const msg = err?.detail || 'Failed to create Tender Bond Guarantee'
+      setError(msg)
+      toast.error(msg)
     } else {
+      toast.success('Tender Bond Guarantee created')
       router.push('/dashboard/tendering_companies')
     }
   }
 
+  const fieldCls = 'mt-1 w-full px-2 py-1 h-8 border rounded-md text-sm'
+  const labelCls = 'block text-xs font-medium'
+  // const section2 = 'grid grid-cols-2 gap-3'
+  const section3 = 'grid grid-cols-3 gap-3'
+
   return (
-    <div className="max-w-lg p-8">
-      <h1 className="text-2xl font-bold mb-6">Create Tendering Company</h1>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {error && <p className="text-red-600">{error}</p>}
+    <div className="max-w-6xl p-6">
+      <h1 className="text-xl font-semibold mb-4">Create Tender Bond Guarantee</h1>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        {error && <p className="text-red-600 text-sm">{error}</p>}
 
-        {/* Company dropdown */}
-        <div>
-          <label className="block text-sm font-medium">Company</label>
-          <select
-            className="mt-1 w-full px-3 py-2 border rounded-md"
-            value={companyId}
-            onChange={e => setCompanyId(e.target.value)}
-            required
-          >
-            <option value="">Select company…</option>
-            {companies.map(c => (
-              <option key={c.company_id} value={c.company_id}>
-                {c.company_name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Tender dropdown */}
-        <div>
-          <label className="block text-sm font-medium">Tender</label>
-          <select
-            className="mt-1 w-full px-3 py-2 border rounded-md"
-            value={tenderId}
-            onChange={e => setTenderId(e.target.value)}
-            required
-          >
-            <option value="">Select tender…</option>
-            {tenders.map(t => (
-              <option key={t.tender_id} value={t.tender_id}>
-                {t.tender_no}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Optional String Fields */}
-{(
-  [
-    ['Tender Receipt No.', receiptNo, setReceiptNo],
-    ['TBG No.', tbgNo, setTbgNo],
-    ['TBG Issuing Bank', tbgBank, setTbgBank],
-    ['Deposit Receipt No.', depositReceipt, setDepositReceipt],
-    ['Cheque No.', chequeNo, setChequeNo],
-    ['TT Ref', ttRef, setTtRef],
-    ['Remarks', remarks, setRemarks],
-  ] as [string, string, React.Dispatch<React.SetStateAction<string>>][]
-).map(([label, val, setter]) => (
-  <div key={label}>
-    <label className="block text-sm font-medium">{label}</label>
-    <input
-      className="mt-1 w-full px-3 py-2 border rounded-md"
-      value={val}
-      onChange={e => setter(e.target.value)}
-    />
-  </div>
-))}
-
-
-        {/* Dates */}
-        {(
-  [
-    ['TT Date', ttDate, setTtDate],
-    ['Document Date', docDate, setDocDate],
-    ['TBG Expiry Date', tbgExpiry, setTbgExpiry],
-    ['TBG Submitted Date', tbgSubmitted, setTbgSubmitted],
-    ['TBG Release Date (DEWA)', tbgReleaseDewa, setTbgReleaseDewa],
-    ['TBG Release Date (Bank)', tbgReleaseBank, setTbgReleaseBank],
-  ] as [string, string, React.Dispatch<React.SetStateAction<string>>][]
-).map(([label, val, setter]) => (
-  <div key={label}>
-    <label className="block text-sm font-medium">{label}</label>
-    <input
-      type="date"
-      className="mt-1 w-full px-3 py-2 border rounded-md"
-      value={val}
-      onChange={e => setter(e.target.value)}
-    />
-  </div>
-))}
-
-
-        {/* Numeric */}
-        <div className="grid grid-cols-2 gap-4">
+        {/* Relationships */}
+        <div className={section3}>
           <div>
-            <label className="block text-sm font-medium">TBG Value</label>
-            <input
-              type="number"
-              step="0.01"
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={tbgValue}
-              onChange={e => setTbgValue(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium">Discount Percent</label>
-            <input
-              type="number"
-              step="0.01"
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={discountPercent}
-              onChange={e => setDiscountPercent(e.target.value)}
-            />
-          </div>
-        </div>
-
-        {/* Extension Dates */}
-        <div>
-          <label className="block text-sm font-medium">
-            Extension Dates (comma-separated YYYY-MM-DD)
-          </label>
-          <input
-            className="mt-1 w-full px-3 py-2 border rounded-md"
-            value={extensionDates}
-            onChange={e => setExtensionDates(e.target.value)}
-          />
-        </div>
-
-        {/* Enums */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium">Currency</label>
-            <select
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={currency}
-              onChange={e => setCurrency(e.target.value)}
-            >
-              {CurrencyOptions.map(c => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
+            <label className={labelCls}>Company</label>
+            <select className={fieldCls} value={companyId} onChange={e=>setCompanyId(e.target.value?Number(e.target.value):'')} required>
+              <option value="">Select company</option>
+              {companies.map(c=>(
+                <option key={c.company_id} value={c.company_id}>{c.company_name}</option>
               ))}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium">Pending Status</label>
-            <select
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={status}
-              onChange={e => setStatus(e.target.value)}
-            >
-              {StatusOptions.map(s => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
+            <label className={labelCls}>Tender</label>
+            <select className={fieldCls} value={tenderId} onChange={e=>setTenderId(e.target.value?Number(e.target.value):'')} required>
+              <option value="">Select tender</option>
+              {tenders.map(t=>(
+                <option key={t.tender_id} value={t.tender_id}>{t.tender_no}</option>
               ))}
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Tender Receipt No</label>
+            <input type="text" className={fieldCls} value={tenderReceiptNo} onChange={e=>setTenderReceiptNo(e.target.value)} />
+          </div>
+        </div>
+
+        {/* TBG block */}
+        <div className={section3}>
+          <div>
+            <label className={labelCls}>TBG No</label>
+            <input type="text" className={fieldCls} value={tbgNo} onChange={e=>setTbgNo(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>Issuing Bank</label>
+            <input type="text" className={fieldCls} value={tbgIssuingBank} onChange={e=>setTbgIssuingBank(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>Deposit Receipt No</label>
+            <input type="text" className={fieldCls} value={tenderDepositReceiptNo} onChange={e=>setTenderDepositReceiptNo(e.target.value)} />
+          </div>
+        </div>
+
+        <div className={section3}>
+          <div>
+            <label className={labelCls}>Cheque No</label>
+            <input type="text" className={fieldCls} value={chequeNo} onChange={e=>setChequeNo(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>TT Ref</label>
+            <input type="text" className={fieldCls} value={ttRef} onChange={e=>setTtRef(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>TT Date</label>
+            <input type="date" className={fieldCls} value={ttDate} onChange={e=>setTtDate(e.target.value)} />
+          </div>
+        </div>
+
+        <div className={section3}>
+          <div>
+            <label className={labelCls}>Document Date</label>
+            <input type="date" className={fieldCls} value={documentDate} onChange={e=>setDocumentDate(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>TBG Value</label>
+            <input type="number" step="0.01" className={fieldCls} value={tbgValue} onChange={e=>setTbgValue(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>TBG Expiry Date</label>
+            <input type="date" className={fieldCls} value={tbgExpiryDate} onChange={e=>setTbgExpiryDate(e.target.value)} />
+          </div>
+        </div>
+
+        <div className={section3}>
+          <div>
+            <label className={labelCls}>TBG Submitted Date</label>
+            <input type="date" className={fieldCls} value={tbgSubmittedDate} onChange={e=>setTbgSubmittedDate(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>TBG Release Date (DEWA)</label>
+            <input type="date" className={fieldCls} value={tbgReleaseDateDewa} onChange={e=>setTbgReleaseDateDewa(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>TBG Release Date (Bank)</label>
+            <input type="date" className={fieldCls} value={tbgReleaseDateBank} onChange={e=>setTbgReleaseDateBank(e.target.value)} />
+          </div>
+        </div>
+
+        {/* Tender extensions (ARRAY(Date)) */}
+        <div className="border rounded-md p-3">
+          <span className="text-xs font-medium text-gray-700">Tender Extension Dates</span>
+          <div className="mt-2 flex gap-2">
+            <input type="date" className={fieldCls + ' max-w-xs'} value={extensionDateInput} onChange={e=>setExtensionDateInput(e.target.value)} />
+            <button type="button" onClick={addExtensionDate} className="px-3 h-8 bg-gray-800 text-white rounded-md text-sm">Add</button>
+          </div>
+          {tenderExtensionDates.length>0 && (
+            <div className="mt-2 flex flex-wrap gap-2">
+              {tenderExtensionDates.map(d=>(
+                <span key={d} className="inline-flex items-center gap-2 px-2 h-7 rounded-full bg-gray-100 text-xs">
+                  {d}
+                  <button type="button" onClick={()=>removeExtensionDate(d)} className="text-gray-600 hover:text-red-600">×</button>
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Currency / Status / Discount / Remarks */}
+        <div className={section3}>
+          <div>
+            <label className={labelCls}>Currency</label>
+            <select className={fieldCls} value={tenderingCurrency} onChange={e=>setTenderingCurrency(e.target.value as Currency)}>
+              <option value="AED">AED</option>
+              <option value="EUR">EUR</option>
+              <option value="USD">USD</option>
+            </select>
+          </div>
+          <div>
+            <label className={labelCls}>Discount %</label>
+            <input type="number" step="0.01" className={fieldCls} value={discountPercent} onChange={e=>setDiscountPercent(e.target.value)} />
+          </div>
+          <div>
+            <label className={labelCls}>Pending Status</label>
+            <select className={fieldCls} value={pendingStatus} onChange={e=>setPendingStatus(e.target.value as PendingStatus)} required>
+              <option value="To be released">To be released</option>
+              <option value="In effect">In effect</option>
+              <option value="Released (By DEWA)">Released (By DEWA)</option>
             </select>
           </div>
         </div>
 
-        {/* Actions */}
-        <div className="flex space-x-2">
-          <button
-            type="submit"
-            disabled={saving}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-          >
-            {saving ? 'Creating…' : 'Create'}
-          </button>
+        <div>
+          <label className={labelCls}>Remarks</label>
+          <textarea className="mt-1 w-full px-2 py-2 border rounded-md text-sm" rows={4} value={remarks} onChange={e=>setRemarks(e.target.value)} />
         </div>
+
+        <button type="submit" disabled={saving} className="w-full py-2 h-10 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
+          {saving ? 'Creating…' : 'Create'}
+        </button>
       </form>
     </div>
   )

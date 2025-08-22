@@ -53,10 +53,10 @@ export default function CreateOrderPage() {
       fetch(`${API}/company_master`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
       fetch(`${API}/tender`,         { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
       fetch(`${API}/order_detail`,   { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-    ]).then(([comps, tnds, ords]: [Company[], Tender[], Order[]]) => {
-      setCompanies(comps || [])
-      setTenders(tnds || [])
-      setOrders(ords || [])
+    ]).then(([comps, tnds, ords]) => {
+      setCompanies(Array.isArray(comps) ? comps : [])
+      setTenders(Array.isArray(tnds) ? tnds : [])
+      setOrders(Array.isArray(ords) ? ords : [])
     }).catch(() => setError('Failed to load dropdowns'))
   }, [API])
 
@@ -275,3 +275,4 @@ export default function CreateOrderPage() {
     </div>
   )
 }
+

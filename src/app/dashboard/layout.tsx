@@ -18,7 +18,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Purchase Orders',    href: '/dashboard/order_detail' },
       { label: 'Ordered Items',       href: '/dashboard/order_item_detail' },
       { label: 'Lot‑wise Monitoring', href: '/dashboard/lot_monitoring' },
-      { label: 'Drawing Details',     href: '/dashboard/event' }, // adjust if needed
+      { label: 'Drawing Details',     href: '/dashboard/drawing_details' }, // adjust if needed
     ],
   },
   {
@@ -32,7 +32,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Guarantees',
     items: [
-      { label: 'Tender Bonds',          href: '/dashboard/counter_guarantee' },
+      { label: 'Tender Bonds',          href: '/dashboard/tendering_companies' },
       { label: 'Performance Bonds',     href: '/dashboard/performance_guarantee' },
       { label: 'Material Performance',  href: '/dashboard/material_performance_guarantee' },
     ],
@@ -40,7 +40,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Tendering',
     items: [
-      { label: 'Tendering Companies',       href: '/dashboard/tendering_companies' },
+      // { label: 'Tendering Companies',       href: '/dashboard/tendering_companies' },
       { label: 'Tendered Items',            href: '/dashboard/tender_company_item' },
       { label: 'Pre‑Tender Clarifications',  href: '/dashboard/pre_tender_clarification' },
       { label: 'Post‑Tender Clarifications', href: '/dashboard/post_tender_clarification' },
