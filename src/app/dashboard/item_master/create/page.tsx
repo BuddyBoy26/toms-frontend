@@ -11,7 +11,7 @@ interface Product {
 
 export default function CreateItemPage() {
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
 
   const [description, setDescription] = useState('')
   const [hsCode, setHsCode] = useState('')

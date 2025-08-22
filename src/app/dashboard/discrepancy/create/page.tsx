@@ -8,7 +8,7 @@ interface Lot { lot_id: string }
 
 export default function CreateDiscrepancyPage() {
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
 
   const [lotId, setLotId] = useState('')
   const [dewaRef, setDewaRef] = useState('')

@@ -16,7 +16,7 @@ interface OrderEvent {
 export default function OrderEventDetailPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
 
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

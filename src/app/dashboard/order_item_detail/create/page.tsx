@@ -9,7 +9,7 @@ interface Item  { item_id: number; item_description: string }
 
 export default function CreateOrderItemPage() {
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
 
   const [orders, setOrders] = useState<Order[]>([])
   const [items, setItems] = useState<Item[]>([])

@@ -8,7 +8,7 @@ interface TC { tendering_companies_id: number; /* add display fields if desired 
 
 export default function CreatePrePTCPage() {
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
 
   const [tcId, setTcId] = useState('')
   const [no, setNo] = useState('')

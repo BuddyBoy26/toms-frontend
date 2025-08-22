@@ -54,7 +54,7 @@ const toInputDate = (val: string | null) => (val ? val.slice(0,10) : '')
 export default function EditPerformanceGuaranteePage() {
   const { id } = useParams() as { id: string } // pg_id
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
 
   const [orders, setOrders] = useState<Order[] | null>([])
   const [rec, setRec] = useState<PerformanceGuaranteeRec | null>(null)

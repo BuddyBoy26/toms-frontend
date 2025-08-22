@@ -19,7 +19,7 @@ export default function TenderListPage() {
   const router = useRouter()
   const [items, setItems] = useState<Tender[]>([])
   const [loading, setLoading] = useState(true)
-  const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
 
   useEffect(() => {
     fetch(`${API}/tender`, {

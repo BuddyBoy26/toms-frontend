@@ -25,7 +25,7 @@ function coerceArray<T>(raw: unknown): T[] {
 
 export default function CreateTenderingCompanyPage() {
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
 
   const [companies, setCompanies] = useState<Company[]>([])
   const [tenders, setTenders] = useState<Tender[]>([])

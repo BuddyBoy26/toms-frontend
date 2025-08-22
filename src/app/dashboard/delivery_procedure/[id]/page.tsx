@@ -33,7 +33,7 @@ const DOC_STATUS = [
 export default function DeliveryProcedureDetailPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
 
   const [lots, setLots] = useState<Lot[]>([])
   const [items, setItems] = useState<OrderItem[]>([])
