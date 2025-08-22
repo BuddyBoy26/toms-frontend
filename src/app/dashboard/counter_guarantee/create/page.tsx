@@ -15,7 +15,7 @@ const STATUS_OPTIONS = [
 
 export default function CreateCounterGuaranteePage() {
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
 
   const [type, setType] = useState(TYPE_OPTIONS[0])
   const [refNumber, setRefNumber] = useState('')

@@ -33,7 +33,7 @@ export default function TenderingCompaniesListPage() {
   const router = useRouter()
   const [items, setItems] = useState<TenderingCompany[]>([])
   const [loading, setLoading] = useState(true)
-  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
 
   useEffect(() => {
     fetch(`${API}/tendering_companies`, {

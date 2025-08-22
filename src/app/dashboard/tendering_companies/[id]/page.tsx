@@ -53,7 +53,7 @@ const toInputDate = (val: string | null) => (val ? val.slice(0,10) : '')
 export default function EditTenderingCompanyPage() {
   const { id } = useParams() as { id: string }
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
 
   const [companies, setCompanies] = useState<Company[]>([])
   const [tenders, setTenders] = useState<Tender[]>([])

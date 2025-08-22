@@ -17,7 +17,7 @@ export default function OrderEventListPage() {
   const router = useRouter()
   const [events, setEvents] = useState<OrderEvent[]>([])
   const [loading, setLoading] = useState(true)
-  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
 
   useEffect(() => {
     fetch(`${API}/order_event`, {

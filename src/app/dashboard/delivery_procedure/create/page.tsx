@@ -15,7 +15,7 @@ const DOC_STATUS: Status[] = [
 
 export default function CreateDeliveryProcedurePage() {
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
 
   const [lotId, setLotId] = useState('')
   const [orderItemDesc, setOrderItemDesc] = useState('')

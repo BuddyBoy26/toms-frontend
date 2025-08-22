@@ -6,7 +6,7 @@ import toast from 'react-hot-toast'
 
 export default function CreateEventPage() {
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
 
   const [description, setDescription] = useState('')
   const [startDt, setStartDt] = useState('') // HTML datetime-local value

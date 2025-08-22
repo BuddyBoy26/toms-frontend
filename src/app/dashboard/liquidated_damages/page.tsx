@@ -16,7 +16,7 @@ export default function LDListPage() {
   const router = useRouter()
   const [items, setItems] = useState<LD[]>([])
   const [loading, setLoading] = useState(true)
-  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api/api'
+  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
 
   useEffect(() => {
     fetch(`${API}/liquidated_damages`, {
