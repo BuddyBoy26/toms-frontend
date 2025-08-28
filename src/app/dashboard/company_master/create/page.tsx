@@ -6,7 +6,7 @@ import { useState } from 'react'
 
 export default function CompanyCreatePage() {
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
+  const API = process.env.NEXT_PUBLIC_BACKEND_API_URL
 
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')

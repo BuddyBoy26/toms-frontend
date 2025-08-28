@@ -19,7 +19,7 @@ export default function PostTenderClarificationListPage() {
   const router = useRouter()
   const [items, setItems] = useState<PTC[]>([])
   const [loading, setLoading] = useState(true)
-  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
+  const API = process.env.NEXT_PUBLIC_BACKEND_API_URL
 
   useEffect(() => {
     fetch(`${API}/post_tender_clarification`, {

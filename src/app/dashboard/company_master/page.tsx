@@ -5,6 +5,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import CustomTable, { Column } from '@/components/CustomTable'
 
+
 interface Company {
   company_id: number
   company_name: string
@@ -15,7 +16,7 @@ export default function CompanyListPage() {
   const router = useRouter()
   const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
-  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
+  const API = process.env.NEXT_PUBLIC_BACKEND_API_URL
 
   useEffect(() => {
     fetch(`${API}/company_master`, {

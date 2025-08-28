@@ -32,7 +32,7 @@ function coerceArray<T>(raw: unknown): T[] {
 
 export default function CreateMaterialPerformanceGuaranteePage() {
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
+  const API = process.env.NEXT_PUBLIC_BACKEND_API_URL
 
   const [orders, setOrders] = useState<Order[] | null>([])
 

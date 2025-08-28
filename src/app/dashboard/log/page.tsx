@@ -17,7 +17,7 @@ export default function LogListPage() {
   const router = useRouter()
   const [logs, setLogs] = useState<Log[]>([])
   const [loading, setLoading] = useState(true)
-  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
+  const API = process.env.NEXT_PUBLIC_BACKEND_API_URL
 
   useEffect(() => {
     fetch(`${API}/logs`, {

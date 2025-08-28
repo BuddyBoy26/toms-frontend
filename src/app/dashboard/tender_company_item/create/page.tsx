@@ -8,7 +8,7 @@ interface TC { tendering_companies_id: number; /* you may add display fields her
 
 export default function CreateTCIPage() {
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
+  const API = process.env.NEXT_PUBLIC_BACKEND_API_URL
 
   const [tciId, setTciId] = useState('')
   const [itemNo, setItemNo] = useState('')

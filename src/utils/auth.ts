@@ -1,6 +1,6 @@
 // /utils/auth.ts
-import { BACKEND_API_URL } from '../constants/apiConstants'
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || BACKEND_API_URL
+import { NEXT_PUBLIC_BACKEND_API_URL } from '../constants/apiConstants'
+const API_BASE = process.env.NEXT_PUBLIC_BACKEND_API_URL || NEXT_PUBLIC_BACKEND_API_URL
 
 interface TokenResponse {
   access_token: string

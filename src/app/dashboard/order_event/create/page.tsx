@@ -8,7 +8,7 @@ interface Order { order_id: number; po_number: string }
 
 export default function CreateOrderEventPage() {
   const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_API_URL || 'https://toms-backend-a7ot.onrender.com/api'
+  const API = process.env.NEXT_PUBLIC_BACKEND_API_URL
 
   const [orderNo, setOrderNo] = useState('')
   const [eventDate, setEventDate] = useState('')
