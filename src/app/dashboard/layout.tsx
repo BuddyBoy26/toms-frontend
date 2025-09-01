@@ -40,7 +40,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Tendering',
     items: [
-      // { label: 'Tendering Companies',       href: '/dashboard/tendering_companies' },
+      { label: 'Tendering Companies',       href: '/dashboard/tendering_companies' },
       { label: 'Tendered Items',            href: '/dashboard/tender_company_item' },
       { label: 'Pre‑Tender Clarifications',  href: '/dashboard/pre_tender_clarification' },
       { label: 'Post‑Tender Clarifications', href: '/dashboard/post_tender_clarification' },
@@ -52,9 +52,9 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Masters',
     items: [
       { label: 'Company Master',  href: '/dashboard/company_master' },
-      { label: 'Company Products', href: '/dashboard/product_master' },
+      { label: 'Product Master', href: '/dashboard/product_master' },
       { label: 'Item Master',     href: '/dashboard/item_master' },
-      { label: 'Tender Master',   href: '/dashboard/tender' },
+      { label: 'Tender Master',   href: '/dashboard/tender_master' },
     ],
   },
   {

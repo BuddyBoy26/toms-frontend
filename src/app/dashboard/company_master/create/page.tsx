@@ -3,6 +3,15 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { allCountries } from 'country-telephone-data'
+
+type ErrorDetail = { msg?: string; [key: string]: unknown }
+
+export type Country = {
+  iso2: string
+  name: string
+  dialCode: string
+}
 
 export default function CompanyCreatePage() {
   const router = useRouter()
@@ -10,6 +19,7 @@ export default function CompanyCreatePage() {
 
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
+  const [country, setCountry] = useState('in') // default: India (iso2)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -17,23 +27,35 @@ export default function CompanyCreatePage() {
     e.preventDefault()
     setError(null)
     setSaving(true)
+
+    const payload = {
+      company_name: name,
+      business_description: desc,
+      country: country, // send iso2 code
+    }
+
     const res = await fetch(`${API}/company_master`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}`,
       },
-      body: JSON.stringify({
-        company_name: name,
-        business_description: desc,
-      }),
+      body: JSON.stringify(payload),
     })
+
     setSaving(false)
+
     if (!res.ok) {
       const err = await res.json().catch(() => null)
-      setError(err?.detail || 'Failed to create company')
+      if (Array.isArray(err?.detail)) {
+        const msg = err.detail.map((d: ErrorDetail) => d.msg || JSON.stringify(d)).join(', ')
+        setError(msg)
+      } else if (typeof err?.detail === 'string') {
+        setError(err.detail)
+      } else {
+        setError('Failed to create company')
+      }
     } else {
-      // on success, go back to list
       router.push('/dashboard/company_master')
     }
   }
@@ -43,6 +65,8 @@ export default function CompanyCreatePage() {
       <h1 className="text-2xl font-bold mb-4">Create Company</h1>
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && <p className="text-red-600">{error}</p>}
+
+        {/* Company Name */}
         <div>
           <label className="block text-sm font-medium">Name</label>
           <input
@@ -52,6 +76,8 @@ export default function CompanyCreatePage() {
             required
           />
         </div>
+
+        {/* Description */}
         <div>
           <label className="block text-sm font-medium">Description</label>
           <textarea
@@ -62,6 +88,25 @@ export default function CompanyCreatePage() {
             required
           />
         </div>
+
+        {/* Country Dropdown */}
+        <div>
+          <label className="block text-sm font-medium">Country</label>
+          <select
+            className="mt-1 w-full px-3 py-2 border rounded-md"
+            value={country}
+            onChange={e => setCountry(e.target.value)}
+            required
+          >
+            {allCountries.map((c: Country) => (
+              <option key={c.iso2} value={c.iso2}>
+                {c.name.split(' ')[0]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Submit */}
         <button
           type="submit"
           disabled={saving}

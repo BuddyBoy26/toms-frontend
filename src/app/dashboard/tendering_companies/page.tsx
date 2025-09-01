@@ -1,64 +1,171 @@
-// src/app/dashboard/tendering_companies/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import CustomTable, { Column } from '@/components/CustomTable'
 
-export interface TenderingCompany {
+type CurrencyEnum = 'AED' | 'EUR' | 'USD'
+type PendingStatusEnum = 'To be released' | 'In effect' | 'Released (By DEWA)'
+
+/** Raw server shapes */
+interface TenderingCompany {
   tendering_companies_id: number
   company_id: number
   tender_id: number
   tender_receipt_no: string | null
   tbg_no: string | null
   tbg_issuing_bank: string | null
-  tender_deposit_receipt_no: string | null
-  cheque_no: string | null
-  tt_ref: string | null
-  tt_date: string | null
-  document_date: string | null
   tbg_value: number | null
   tbg_expiry_date: string | null
-  tbg_submitted_date: string | null
-  tbg_release_date_dewa: string | null
-  tbg_release_date_bank: string | null
-  tender_extension_dates: string[] | null
-  tendering_currency: string
-  discount_percent: number | null
-  remarks: string | null
-  pending_status: string
+  tendering_currency: CurrencyEnum
+  pending_status: PendingStatusEnum
+  debit_advice_no: string | null
+  tender_bought: 0 | 1
+  participated: 0 | 1
+  result_saved: 0 | 1
+  evaluations_received: 0 | 1
+  memo: 0 | 1
+  po_copies: 0 | 1
+}
+
+interface Tender {
+  tender_id: number
+  tender_no: string
+  tender_description: string
+  tender_date: string // invite date
+  closing_date: string
+  tender_fees: number | null
+}
+
+interface Company {
+  company_id: number
+  company_name: string
+}
+
+/** Composed row shape for the table */
+interface Row {
+  tendering_companies_id: number
+  tender_no: string
+  tender_description: string
+  fees: string
+  invite_date: string
+  closing_date: string
+  tbg_amount: string
+  company: string
+  tender_bought: string      // "Y"/"N"
+  participated: string       // "Y"/"N"
+  debit_advice_no: string
+  result_saved: string       // "Y"/"N"
+  evaluations_received: string // "Y"/"N"
+  memo: string               // "Y"/"N"
+  po_copies: string          // "Y"/"N"
 }
 
 export default function TenderingCompaniesListPage() {
   const router = useRouter()
-  const [items, setItems] = useState<TenderingCompany[]>([])
-  const [loading, setLoading] = useState(true)
   const API = process.env.NEXT_PUBLIC_BACKEND_API_URL
 
-  useEffect(() => {
-    fetch(`${API}/tendering_companies`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}` },
-    })
-      .then(res => res.json())
-      .then((data: TenderingCompany[]) => setItems(data))
-      .finally(() => setLoading(false))
-  }, [])
+  const [tcs, setTcs] = useState<TenderingCompany[]>([])
+  const [tenders, setTenders] = useState<Tender[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
-  const columns: Column<TenderingCompany>[] = [
+  useEffect(() => {
+    const token = localStorage.getItem('kkabbas_token')
+    async function loadAll() {
+      try {
+        const [tcRes, tendRes, compRes] = await Promise.all([
+          fetch(`${API}/tendering_companies`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API}/tender`,               { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API}/company_master`,       { headers: { Authorization: `Bearer ${token}` } }),
+        ])
+
+        if (!tcRes.ok) throw new Error(`Failed to load tendering companies (${tcRes.status})`)
+        if (!tendRes.ok) throw new Error(`Failed to load tenders (${tendRes.status})`)
+        if (!compRes.ok) throw new Error(`Failed to load companies (${compRes.status})`)
+
+        const [tcData, tenderData, companyData] = await Promise.all([
+          tcRes.json(), tendRes.json(), compRes.json()
+        ])
+
+        setTcs(Array.isArray(tcData) ? tcData : [])
+        setTenders(Array.isArray(tenderData) ? tenderData : [])
+        setCompanies(Array.isArray(companyData) ? companyData : [])
+      } catch (e: unknown) {
+        setError((e as Error)?.message || 'Failed to load list')
+      } finally {
+        setLoading(false)
+      }
+    }
+    loadAll()
+  }, [API])
+
+  const tenderMap = useMemo(() => {
+    const m = new Map<number, Tender>()
+    for (const t of tenders) m.set(t.tender_id, t)
+    return m
+  }, [tenders])
+
+  const companyMap = useMemo(() => {
+    const m = new Map<number, Company>()
+    for (const c of companies) m.set(c.company_id, c)
+    return m
+  }, [companies])
+
+  const yn = (v: 0 | 1 | boolean | null | undefined) => (v ? 'Y' : 'N')
+  const fmt = (v: unknown) => (v === null || v === undefined || v === '' ? '-' : String(v))
+
+  const rows: Row[] = useMemo(() => {
+    return tcs.map(tc => {
+      const t = tenderMap.get(tc.tender_id)
+      const c = companyMap.get(tc.company_id)
+
+      return {
+        tendering_companies_id: tc.tendering_companies_id,
+        tender_no: fmt(t?.tender_no),
+        tender_description: fmt(t?.tender_description),
+        fees: t?.tender_fees != null ? String(t.tender_fees) : '-',
+        invite_date: fmt(t?.tender_date),
+        closing_date: fmt(t?.closing_date),
+        tbg_amount: tc.tbg_value != null ? String(tc.tbg_value) : '-',
+        company: fmt(c?.company_name),
+        tender_bought: yn(tc.tender_bought),
+        participated: yn(tc.participated),
+        debit_advice_no: fmt(tc.debit_advice_no),
+        result_saved: yn(tc.result_saved),
+        evaluations_received: yn(tc.evaluations_received),
+        memo: yn(tc.memo),
+        po_copies: yn(tc.po_copies),
+      }
+    })
+  }, [tcs, tenderMap, companyMap])
+
+  const columns: Column<Row>[] = [
     { key: 'tendering_companies_id', header: 'ID' },
-    { key: 'company_id', header: 'Company ID' },
-    { key: 'tender_id', header: 'Tender ID' },
-    { key: 'pending_status', header: 'Status' },
-    { key: 'tendering_currency', header: 'Currency' },
+    { key: 'tender_no', header: 'Tender No' },
+    { key: 'tender_description', header: 'Tender Description' },
+    { key: 'fees', header: 'Fees' },
+    { key: 'invite_date', header: 'Invite Date' },
+    { key: 'closing_date', header: 'Closing Date' },
+    { key: 'tbg_amount', header: 'TBG Amount' },
+    { key: 'company', header: 'Company' },
+    { key: 'tender_bought', header: 'Tender' },           // Bought?
+    { key: 'participated', header: 'Participated?' },
+    { key: 'debit_advice_no', header: 'Debit Advice' },
+    { key: 'result_saved', header: 'Result' },
+    { key: 'evaluations_received', header: 'Evaluation' },
+    { key: 'memo', header: 'Memo' },
+    { key: 'po_copies', header: 'PO copies' },
   ]
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">Tendering Companies</h1>
+      <div className="mb-4 flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Tendering Details</h1>
         <button
           onClick={() => router.push('/dashboard/tendering_companies/create')}
-          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition"
+          className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700"
         >
           + Create
         </button>
@@ -66,9 +173,11 @@ export default function TenderingCompaniesListPage() {
 
       {loading ? (
         <p>Loading…</p>
-      ) : items.length > 0 ? (
+      ) : error ? (
+        <p className="text-red-600">{error}</p>
+      ) : rows.length ? (
         <CustomTable
-          data={items}
+          data={rows}
           columns={columns}
           idField="tendering_companies_id"
           linkPrefix="/dashboard/tendering_companies"

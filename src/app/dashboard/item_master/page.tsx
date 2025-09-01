@@ -44,8 +44,10 @@ export default function ItemListPage() {
           }
         })
         setItems(merged)
+        console.log(merged)
       })
       .finally(() => setLoading(false))
+    
   }, [API])
 
   const columns: Column<ItemWithProduct>[] = [

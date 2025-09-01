@@ -4,18 +4,18 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
-interface Company {
-  company_id: number
-  company_name: string
-}
+// interface Company {
+//   company_id: number
+//   company_name: string
+// }
 
 export default function CreateProductPage() {
   const router = useRouter()
   const API = process.env.NEXT_PUBLIC_BACKEND_API_URL
 
   const [name, setName] = useState('')
-  const [companyName, setCompanyName] = useState('')
-  const [companies, setCompanies] = useState<Company[]>([])
+  // const [companyName, setCompanyName] = useState('')
+  // const [companies, setCompanies] = useState<Company[]>([])
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -26,7 +26,7 @@ export default function CreateProductPage() {
       headers: { Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}` },
     })
       .then(res => res.json())
-      .then((data: Company[]) => setCompanies(data))
+      // .then((data: Company[]) => setCompanies(data))
       .catch(() => setError('Failed to load companies'))
   }, [API])
 
@@ -35,16 +35,16 @@ export default function CreateProductPage() {
     setError(null)
     setSaving(true)
 
-    const chosen = companies.find(c => c.company_name === companyName)
-    if (!chosen) {
-      setError('Please select a valid company from the list')
-      setSaving(false)
-      return
-    }
+    // const chosen = companies.find(c => c.company_name === companyName)
+    // if (!chosen) {
+    //   setError('Please select a valid company from the list')
+    //   setSaving(false)
+    //   return
+    // }
 
     const payload = {
       product_name: name,
-      company_id: chosen.company_id,
+      // company_id: chosen.company_id,
     }
 
     const res = await fetch(`${API}/product_master`, {
@@ -88,7 +88,7 @@ export default function CreateProductPage() {
           />
         </div>
 
-        <div>
+        {/* <div>
           <label htmlFor="companySelect" className="block text-sm font-medium">
             Company
           </label>
@@ -106,7 +106,7 @@ export default function CreateProductPage() {
               <option key={c.company_id} value={c.company_name} />
             ))}
           </datalist>
-        </div>
+        </div> */}
 
         <button
           type="submit"

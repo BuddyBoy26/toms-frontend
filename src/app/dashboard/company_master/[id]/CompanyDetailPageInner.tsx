@@ -3,7 +3,13 @@
 
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState, useMemo } from 'react'
-import CustomTable, { Column } from '@/components/CustomTable'
+import { allCountries } from 'country-telephone-data'   // ✅ country list
+
+export type Country = {
+  iso2: string
+  name: string
+  dialCode: string
+}
 
 interface Product {
   product_id: number
@@ -14,7 +20,22 @@ interface Company {
   company_id: number
   company_name: string
   business_description: string
+  country: string // may be ISO2 or full name depending on your DB history
   products?: Product[]
+}
+
+// 🔧 helper: normalize any DB value (name or iso2) to iso2 for the select
+function toIso2(val?: string | null): string {
+  if (!val) return ''
+  const v = val.trim().toLowerCase()
+  const hit = allCountries.find(
+    (c: Country) =>
+      c.iso2.toLowerCase() === v ||
+      c.name.toLowerCase() === v ||
+      `+${c.dialCode}`.toLowerCase() === v ||
+      c.dialCode.toLowerCase() === v
+  )
+  return hit ? hit.iso2 : ''
 }
 
 export default function CompanyDetailPageInner() {
@@ -26,8 +47,10 @@ export default function CompanyDetailPageInner() {
   const [allProducts, setAllProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+
   const [name, setName] = useState('')
   const [desc, setDesc] = useState('')
+  const [countryIso2, setCountryIso2] = useState('') // ✅ keep ISO2 in state
   const [selectedProductId, setSelectedProductId] = useState<number | ''>('')
 
   const [token, setToken] = useState<string | null>(null)
@@ -54,6 +77,8 @@ export default function CompanyDetailPageInner() {
         setAllProducts(prods)
         setName(safeCompany.company_name)
         setDesc(safeCompany.business_description)
+        // ✅ normalize whatever DB stored (ISO2 or name) → ISO2 for the select
+        setCountryIso2(toIso2(safeCompany.country))
       })
       .finally(() => setLoading(false))
   }, [API, id, token])
@@ -70,12 +95,14 @@ export default function CompanyDetailPageInner() {
       body: JSON.stringify({
         company_name: updated.company_name,
         business_description: updated.business_description,
+        country: countryIso2, // ✅ always send ISO2
         product_ids: (Array.isArray(updated.products) ? updated.products : []).map(p => p.product_id),
       }),
     })
     setSaving(false)
     setCompany({
       ...updated,
+      country: countryIso2, // keep local copy consistent
       products: Array.isArray(updated.products) ? updated.products : [],
     })
   }
@@ -87,6 +114,7 @@ export default function CompanyDetailPageInner() {
       ...company,
       company_name: name,
       business_description: desc,
+      country: countryIso2, // store ISO2 in model copy too
     })
   }
 
@@ -101,7 +129,7 @@ export default function CompanyDetailPageInner() {
   }
 
   const handleAddProduct = async () => {
-    if (!selectedProductId || !company) return
+    if (selectedProductId === '' || !company) return
     const productToAdd = allProducts.find(p => p.product_id === Number(selectedProductId))
     if (!productToAdd) return
     const currentProducts = Array.isArray(company.products) ? company.products : []
@@ -143,11 +171,6 @@ export default function CompanyDetailPageInner() {
   if (loading) return <p>Loading company…</p>
   if (!company) return <p>Company not found.</p>
 
-  const productColumns: Column<Product>[] = [
-    { key: 'product_id', header: 'ID' },
-    { key: 'product_name', header: 'Product Name' },
-  ]
-
   return (
     <div className="max-w-3xl space-y-8">
       <div>
@@ -170,7 +193,25 @@ export default function CompanyDetailPageInner() {
               onChange={e => setDesc(e.target.value)}
             />
           </div>
-          <div className="flex space-x-2">
+
+          {/* ✅ Country dropdown (ISO2 values) */}
+          <div>
+            <label className="block text-sm font-medium">Country</label>
+            <select
+              className="mt-1 w-full px-3 py-2 border rounded-md"
+              value={countryIso2}
+              onChange={e => setCountryIso2(e.target.value)}
+            >
+              <option value="">-- Select Country --</option>
+              {allCountries.map((c: Country) => (
+                <option key={c.iso2} value={c.iso2}>
+                  {c.name} (+{c.dialCode})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex space-x-2 mt-8">
             <button
               type="submit"
               disabled={saving}
@@ -189,14 +230,17 @@ export default function CompanyDetailPageInner() {
         </form>
       </div>
 
+      {/* Products */}
       <div>
         <h2 className="text-xl font-semibold mb-4">Products</h2>
 
-        <div className="flex items-center space-x-2 mb-4">
+        <div className="mb-4 flex items-center space-x-2">
           <select
             className="px-3 py-2 border rounded-md"
             value={selectedProductId}
-            onChange={e => setSelectedProductId(Number(e.target.value))}
+            onChange={e =>
+              setSelectedProductId(e.target.value === '' ? '' : Number(e.target.value)) // ✅ avoid Number('') -> 0
+            }
           >
             <option value="">-- Select Product --</option>
             {selectableProducts.map(p => (
@@ -212,13 +256,6 @@ export default function CompanyDetailPageInner() {
             Add
           </button>
         </div>
-
-        <CustomTable
-          data={companyProducts}
-          columns={productColumns}
-          idField="product_id"
-          linkPrefix="/dashboard/product_master"
-        />
 
         <ul className="mt-4 space-y-2">
           {companyProducts.map(p => (

@@ -1,176 +1,301 @@
-// src/app/dashboard/pre_tender_clarification/create/page.tsx
 'use client'
 
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState } from 'react'
 
-interface TC { tendering_companies_id: number; /* add display fields if desired */ }
+interface Tender {
+  tender_id: number
+  tender_no: string
+  tender_description: string
+}
 
-export default function CreatePrePTCPage() {
+interface Company {
+  company_id: number
+  company_name: string
+}
+
+interface TenderingCompany {
+  tendering_companies_id: number
+  tender_id: number
+  company_id: number
+}
+
+export default function PtcCreatePage() {
   const router = useRouter()
   const API = process.env.NEXT_PUBLIC_BACKEND_API_URL
 
-  const [tcId, setTcId] = useState('')
-  const [no, setNo] = useState('')
-  const [refNo, setRefNo] = useState('')
-  const [date, setDate] = useState('')
-  const [received, setReceived] = useState('')
-  const [replyBy, setReplyBy] = useState('')
-  const [replySubmitted, setReplySubmitted] = useState('')
-  const [tcs, setTcs] = useState<TC[]>([])
+  const [tenders, setTenders] = useState<Tender[]>([])
+  const [tcs, setTcs] = useState<TenderingCompany[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
   const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string|null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  // selected
+  const [selectedTenderId, setSelectedTenderId] = useState<number | ''>('')
+  const [selectedTcId, setSelectedTcId] = useState<number | ''>('') // resolved tc (tenderer) for the PTC
+
+  // fields
+  const [ptcNo, setPtcNo] = useState<string>('') // numeric text
+  const [ptcRefNo, setPtcRefNo] = useState<string>('')
+  const [ptcDate, setPtcDate] = useState<string>('')
+  const [ptcReceivedDate, setPtcReceivedDate] = useState<string>('')
+  const [ptcSentDate, setPtcSentDate] = useState<string>('')
 
   useEffect(() => {
-    fetch(`${API}/tendering_companies`, {
-      headers: { Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}` },
-    })
-      .then(r => r.json())
-      .then((data: TC[]) => setTcs(data))
-      .catch(() => setError('Failed to load Tender-Company list'))
+    const token = localStorage.getItem('kkabbas_token')
+    async function loadAll() {
+      try {
+        const [tRes, tcRes, cRes] = await Promise.all([
+          fetch(`${API}/tender`,                 { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API}/tendering_companies`,    { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API}/company_master`,         { headers: { Authorization: `Bearer ${token}` } }),
+        ])
+        if (!tRes.ok) throw new Error('Failed to load tenders')
+        if (!tcRes.ok) throw new Error('Failed to load tendering companies')
+        if (!cRes.ok) throw new Error('Failed to load companies')
+
+        setTenders(await tRes.json())
+        setTcs(await tcRes.json())
+        setCompanies(await cRes.json())
+      } catch (e: unknown) {
+        setError((e as Error)?.message || 'Load failed')
+      }
+    }
+    loadAll()
   }, [API])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const tenderById = useMemo(() => {
+    const m = new Map<number, Tender>()
+    for (const t of tenders) m.set(t.tender_id, t)
+    return m
+  }, [tenders])
+
+  const companyById = useMemo(() => {
+    const m = new Map<number, Company>()
+    for (const c of companies) m.set(c.company_id, c)
+    return m
+  }, [companies])
+
+  const tenderersForTender = useMemo(() => {
+    if (selectedTenderId === '') return []
+    return tcs.filter(x => x.tender_id === Number(selectedTenderId))
+  }, [selectedTenderId, tcs])
+
+  // Autofill tenderer & tc id
+  useEffect(() => {
+    if (tenderersForTender.length === 1) {
+      setSelectedTcId(tenderersForTender[0].tendering_companies_id)
+    } else {
+      setSelectedTcId('') // let user pick if multiple
+    }
+  }, [tenderersForTender])
+
+  const tendererCompanyName = useMemo(() => {
+    if (selectedTcId === '') {
+      if (tenderersForTender.length === 1) {
+        const only = tenderersForTender[0]
+        return companyById.get(only.company_id)?.company_name || ''
+      }
+      return ''
+    }
+    const tc = tcs.find(x => x.tendering_companies_id === Number(selectedTcId))
+    return tc ? (companyById.get(tc.company_id)?.company_name || '') : ''
+  }, [selectedTcId, tenderersForTender, tcs, companyById])
+
+  const tenderDescription = useMemo(() => {
+    if (selectedTenderId === '') return ''
+    return tenderById.get(Number(selectedTenderId))?.tender_description || ''
+  }, [selectedTenderId, tenderById])
+
+  const canSubmit = useMemo(() => {
+    return (
+      selectedTenderId !== '' &&
+      (selectedTcId !== '' || tenderersForTender.length === 1) &&
+      ptcNo.trim() !== '' &&
+      ptcRefNo.trim() !== '' &&
+      ptcDate !== '' &&
+      ptcReceivedDate !== '' &&
+      ptcSentDate !== ''
+    )
+  }, [
+    selectedTenderId, selectedTcId, tenderersForTender.length,
+    ptcNo, ptcRefNo, ptcDate, ptcReceivedDate, ptcSentDate
+  ])
+
+  const submit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
+    if (!canSubmit) return
+    const token = localStorage.getItem('kkabbas_token')
     setSaving(true)
-    const tc = tcs.find(tc => String(tc.tendering_companies_id) === tcId)
-    if (!tc) {
-      setError('Please select a valid Tender-Company')
+    setError(null)
+
+    // final tc id
+    const tcId =
+      selectedTcId !== ''
+        ? Number(selectedTcId)
+        : tenderersForTender.length === 1
+        ? tenderersForTender[0].tendering_companies_id
+        : null
+
+    if (!tcId) {
       setSaving(false)
+      setError('Please select Tenderer.')
       return
     }
+
     const payload = {
-      tendering_companies_id: tc.tendering_companies_id,
-      pre_ptc_no: parseInt(no, 10),
-      pre_ptc_ref_no: refNo,
-      pre_ptc_date: date,
-      pre_ptc_received_date: received,
-      pre_ptc_reply_required_by: replyBy,
-      pre_ptc_reply_submission_date: replySubmitted || null,
+      tc_id: tcId,
+      pre_ptc_no: Number(ptcNo),
+      pre_ptc_ref_no: ptcRefNo,
+      pre_ptc_date: ptcDate,
+      pre_ptc_received_date: ptcReceivedDate,
+      pre_ptc_sent_date: ptcSentDate,
     }
+
     const res = await fetch(`${API}/pre_tender_clarification`, {
       method: 'POST',
-      headers: {
-        'Content-Type':'application/json',
-        Authorization:`Bearer ${localStorage.getItem('kkabbas_token')}`
-      },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify(payload),
     })
+
     setSaving(false)
+
     if (!res.ok) {
       const err = await res.json().catch(() => null)
-      setError(err?.detail || 'Failed to create')
-    } else {
-      router.push('/dashboard/pre_tender_clarification')
+      setError(typeof err?.detail === 'string' ? err.detail : 'Create failed')
+      return
     }
+
+    router.push('/dashboard/pre_tender_clarification')
   }
 
   return (
-    <div className="max-w-lg p-8">
-      <h1 className="text-2xl font-bold mb-6">Create Pre-Tender Clarification</h1>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {error && <p className="text-red-600">{error}</p>}
+    <div className="mx-auto max-w-3xl">
+      <h1 className="mb-4 text-2xl font-bold">Create Pre Tender Clarification</h1>
 
+      {error && <p className="mb-3 text-red-600">{error}</p>}
+
+      <form onSubmit={submit} className="space-y-4">
+        {/* Tender No dropdown */}
         <div>
-          <label htmlFor="tcSelect" className="block text-sm font-medium">
-            Tender-Company ID
-          </label>
-          <input
-            id="tcSelect"
-            list="tcs"
-            className="mt-1 w-full px-3 py-2 border rounded-md"
-            placeholder="Type ID…"
-            value={tcId}
-            onChange={e => setTcId(e.target.value)}
+          <label className="block text-sm font-medium">Tender No</label>
+          <select
+            className="mt-1 w-full rounded-md border px-3 py-2"
+            value={selectedTenderId}
+            onChange={e => setSelectedTenderId(e.target.value === '' ? '' : Number(e.target.value))}
             required
-          />
-          <datalist id="tcs">
-            {tcs.map(tc => (
-              <option key={tc.tendering_companies_id} value={String(tc.tendering_companies_id)} />
+          >
+            <option value="">-- Select Tender --</option>
+            {tenders.map(t => (
+              <option key={t.tender_id} value={t.tender_id}>{t.tender_no}</option>
             ))}
-          </datalist>
+          </select>
         </div>
 
-        <div>
-          <label htmlFor="no" className="block text-sm font-medium">PTC No.</label>
-          <input
-            id="no"
-            type="number"
-            className="mt-1 w-full px-3 py-2 border rounded-md"
-            value={no}
-            onChange={e => setNo(e.target.value)}
-            required
-          />
-        </div>
-
-        <div>
-          <label htmlFor="refNo" className="block text-sm font-medium">Reference No.</label>
-          <input
-            id="refNo"
-            type="text"
-            className="mt-1 w-full px-3 py-2 border rounded-md"
-            value={refNo}
-            onChange={e => setRefNo(e.target.value)}
-            required
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
+        {/* Auto-filled fields */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label htmlFor="date" className="block text-sm font-medium">Date</label>
+            <label className="block text-sm font-medium">Tender Description</label>
             <input
-              id="date"
-              type="date"
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={date}
-              onChange={e => setDate(e.target.value)}
+              className="mt-1 w-full rounded-md border bg-gray-50 px-3 py-2"
+              value={tenderDescription}
+              readOnly
+            />
+          </div>
+
+          {/* Tenderer: if multiple tenderers exist for selected tender, allow choose; else readonly */}
+          <div>
+            <label className="block text-sm font-medium">Tenderer</label>
+            {tenderersForTender.length <= 1 ? (
+              <input
+                className="mt-1 w-full rounded-md border bg-gray-50 px-3 py-2"
+                value={tendererCompanyName}
+                readOnly
+              />
+            ) : (
+              <select
+                className="mt-1 w-full rounded-md border px-3 py-2"
+                value={selectedTcId}
+                onChange={e => setSelectedTcId(e.target.value === '' ? '' : Number(e.target.value))}
+                required
+              >
+                <option value="">-- Select Tenderer --</option>
+                {tenderersForTender.map(tc => (
+                  <option key={tc.tendering_companies_id} value={tc.tendering_companies_id}>
+                    {companyById.get(tc.company_id)?.company_name || `Company #${tc.company_id}`}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
+        </div>
+
+        {/* PTC fields */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <label className="block text-sm font-medium">PTC No</label>
+            <input
+              type="number"
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              value={ptcNo}
+              onChange={e => setPtcNo(e.target.value)}
               required
             />
           </div>
           <div>
-            <label htmlFor="received" className="block text-sm font-medium">Received Date</label>
+            <label className="block text-sm font-medium">PTC Ref No</label>
             <input
-              id="received"
-              type="date"
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={received}
-              onChange={e => setReceived(e.target.value)}
-              required
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="replyBy" className="block text-sm font-medium">Reply Required By</label>
-            <input
-              id="replyBy"
-              type="date"
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={replyBy}
-              onChange={e => setReplyBy(e.target.value)}
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              value={ptcRefNo}
+              onChange={e => setPtcRefNo(e.target.value)}
               required
             />
           </div>
           <div>
-            <label htmlFor="replySubmitted" className="block text-sm font-medium">
-              Reply Submission Date
-            </label>
+            <label className="block text-sm font-medium">PTC Date</label>
             <input
-              id="replySubmitted"
               type="date"
-              className="mt-1 w-full px-3 py-2 border rounded-md"
-              value={replySubmitted}
-              onChange={e => setReplySubmitted(e.target.value)}
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              value={ptcDate}
+              onChange={e => setPtcDate(e.target.value)}
+              required
             />
           </div>
+          <div>
+            <label className="block text-sm font-medium">PTC Received Date</label>
+            <input
+              type="date"
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              value={ptcReceivedDate}
+              onChange={e => setPtcReceivedDate(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium">PTC Sent Date</label>
+            <input
+              type="date"
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              value={ptcSentDate}
+              onChange={e => setPtcSentDate(e.target.value)}
+              required
+            />
+          </div>
+          {/* <div>
+            <label className="block text-sm font-medium">Reply Submission Date</label>
+            <input
+              type="date"
+              className="mt-1 w-full rounded-md border px-3 py-2"
+              value={ptcReplySubmissionDate}
+              onChange={e => setPtcReplySubmissionDate(e.target.value)}
+            />
+          </div> */}
         </div>
 
         <button
           type="submit"
-          disabled={saving}
-          className="w-full py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+          disabled={saving || !canSubmit}
+          className="rounded-md bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
         >
           {saving ? 'Creating…' : 'Create'}
         </button>
