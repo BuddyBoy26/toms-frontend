@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import CustomTable, { Column } from '@/components/CustomTable'
+import Loader from '@/components/Loader'
 
 type CurrencyEnum = 'AED' | 'EUR' | 'USD'
 type PendingStatusEnum = 'To be released' | 'In effect' | 'Released (By DEWA)'
@@ -32,7 +33,7 @@ interface Tender {
   tender_id: number
   tender_no: string
   tender_description: string
-  tender_date: string // invite date
+  tender_date: string
   closing_date: string
   tender_fees: number | null
 }
@@ -52,13 +53,31 @@ interface Row {
   closing_date: string
   tbg_amount: string
   company: string
-  tender_bought: string      // "Y"/"N"
-  participated: string       // "Y"/"N"
+  tender_bought: string
+  participated: string
   debit_advice_no: string
-  result_saved: string       // "Y"/"N"
-  evaluations_received: string // "Y"/"N"
-  memo: string               // "Y"/"N"
-  po_copies: string          // "Y"/"N"
+  result_saved: string
+  evaluations_received: string
+  memo: string
+  po_copies: string
+}
+
+// Utility function for number formatting
+const formatNumber = (value: number | null): string => {
+  if (value === null || value === undefined) return '-'
+  
+  const numStr = String(value)
+  const parts = numStr.split('.')
+  const integerPart = parts[0]
+  const decimalPart = parts[1]
+  
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  
+  if (decimalPart !== undefined) {
+    return `${formattedInteger}.${decimalPart.slice(0, 2)}`
+  }
+  
+  return formattedInteger
 }
 
 export default function TenderingCompaniesListPage() {
@@ -72,34 +91,36 @@ export default function TenderingCompaniesListPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    fetchData()
+  }, [])
+
+  const fetchData = async () => {
     const token = localStorage.getItem('kkabbas_token')
-    async function loadAll() {
-      try {
-        const [tcRes, tendRes, compRes] = await Promise.all([
-          fetch(`${API}/tendering_companies`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${API}/tender`,               { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${API}/company_master`,       { headers: { Authorization: `Bearer ${token}` } }),
-        ])
+    setLoading(true)
+    try {
+      const [tcRes, tendRes, compRes] = await Promise.all([
+        fetch(`${API}/tendering_companies`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/tender`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/company_master`, { headers: { Authorization: `Bearer ${token}` } }),
+      ])
 
-        if (!tcRes.ok) throw new Error(`Failed to load tendering companies (${tcRes.status})`)
-        if (!tendRes.ok) throw new Error(`Failed to load tenders (${tendRes.status})`)
-        if (!compRes.ok) throw new Error(`Failed to load companies (${compRes.status})`)
+      if (!tcRes.ok) throw new Error(`Failed to load tendering companies (${tcRes.status})`)
+      if (!tendRes.ok) throw new Error(`Failed to load tenders (${tendRes.status})`)
+      if (!compRes.ok) throw new Error(`Failed to load companies (${compRes.status})`)
 
-        const [tcData, tenderData, companyData] = await Promise.all([
-          tcRes.json(), tendRes.json(), compRes.json()
-        ])
+      const [tcData, tenderData, companyData] = await Promise.all([
+        tcRes.json(), tendRes.json(), compRes.json()
+      ])
 
-        setTcs(Array.isArray(tcData) ? tcData : [])
-        setTenders(Array.isArray(tenderData) ? tenderData : [])
-        setCompanies(Array.isArray(companyData) ? companyData : [])
-      } catch (e: unknown) {
-        setError((e as Error)?.message || 'Failed to load list')
-      } finally {
-        setLoading(false)
-      }
+      setTcs(Array.isArray(tcData) ? tcData : [])
+      setTenders(Array.isArray(tenderData) ? tenderData : [])
+      setCompanies(Array.isArray(companyData) ? companyData : [])
+    } catch (e: unknown) {
+      setError((e as Error)?.message || 'Failed to load list')
+    } finally {
+      setLoading(false)
     }
-    loadAll()
-  }, [API])
+  }
 
   const tenderMap = useMemo(() => {
     const m = new Map<number, Tender>()
@@ -125,10 +146,10 @@ export default function TenderingCompaniesListPage() {
         tendering_companies_id: tc.tendering_companies_id,
         tender_no: fmt(t?.tender_no),
         tender_description: fmt(t?.tender_description),
-        fees: t?.tender_fees != null ? String(t.tender_fees) : '-',
+        fees: t?.tender_fees != null ? formatNumber(t.tender_fees) : '-',
         invite_date: fmt(t?.tender_date),
         closing_date: fmt(t?.closing_date),
-        tbg_amount: tc.tbg_value != null ? String(tc.tbg_value) : '-',
+        tbg_amount: tc.tbg_value != null ? formatNumber(tc.tbg_value) : '-',
         company: fmt(c?.company_name),
         tender_bought: yn(tc.tender_bought),
         participated: yn(tc.participated),
@@ -143,14 +164,14 @@ export default function TenderingCompaniesListPage() {
 
   const columns: Column<Row>[] = [
     { key: 'tendering_companies_id', header: 'ID' },
+    { key: 'company', header: 'Company' },
     { key: 'tender_no', header: 'Tender No' },
     { key: 'tender_description', header: 'Tender Description' },
     { key: 'fees', header: 'Fees' },
     { key: 'invite_date', header: 'Invite Date' },
     { key: 'closing_date', header: 'Closing Date' },
     { key: 'tbg_amount', header: 'TBG Amount' },
-    { key: 'company', header: 'Company' },
-    { key: 'tender_bought', header: 'Tender' },           // Bought?
+    { key: 'tender_bought', header: 'Tender' },
     { key: 'participated', header: 'Participated?' },
     { key: 'debit_advice_no', header: 'Debit Advice' },
     { key: 'result_saved', header: 'Result' },
@@ -162,9 +183,9 @@ export default function TenderingCompaniesListPage() {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Tendering Details</h1>
+        <h1 className="text-2xl font-bold">Tendering Company Details</h1>
         <button
-          onClick={() => router.push('/dashboard/tendering_companies/create')}
+          onClick={() => router.push('/dashboard/tendering_company_details/create')}
           className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700"
         >
           + Create
@@ -172,7 +193,7 @@ export default function TenderingCompaniesListPage() {
       </div>
 
       {loading ? (
-        <p>Loading…</p>
+        <Loader />
       ) : error ? (
         <p className="text-red-600">{error}</p>
       ) : rows.length ? (
@@ -180,7 +201,7 @@ export default function TenderingCompaniesListPage() {
           data={rows}
           columns={columns}
           idField="tendering_companies_id"
-          linkPrefix="/dashboard/tendering_companies"
+          linkPrefix="/dashboard/tendering_company_details"
         />
       ) : (
         <p className="text-gray-600">No records found.</p>

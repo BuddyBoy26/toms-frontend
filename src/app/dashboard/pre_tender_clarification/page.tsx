@@ -1,24 +1,10 @@
+// src/app/dashboard/pre_tender_clarifications/page.tsx
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useMemo } from 'react'
 import CustomTable, { Column } from '@/components/CustomTable'
-
-interface pre_ptc {
-  pre_ptc_id: number
-  tc_id: number
-  pre_ptc_no: number
-  pre_ptc_ref_no: string
-  pre_ptc_date: string
-  pre_ptc_received_date: string
-  pre_ptc_reply_sent_date: string
-}
-
-interface TenderingCompany {
-  tendering_companies_id: number
-  tender_id: number
-  company_id: number
-}
+import Loader from '@/components/Loader'
+import { generatePDF } from '@/utils/pdfGenerator'
 
 interface Tender {
   tender_id: number
@@ -31,104 +17,797 @@ interface Company {
   company_name: string
 }
 
-interface Row extends pre_ptc {
-  tender_no: string
-  tender_description: string
-  company_name: string
+interface TenderingCompany {
+  tendering_companies_id: number
+  company_id: number
+  tender_id: number
 }
 
-export default function PrePtcListPage() {
-  const router = useRouter()
-  const API = process.env.NEXT_PUBLIC_BACKEND_API_URL
+interface PreTenderClarification {
+  pre_ptc_id: number
+  tc_id: number
+  pre_ptc_no: number
+  pre_ptc_ref_no: string
+  pre_ptc_date: string
+  pre_ptc_received_date: string
+  pre_ptc_sent_date: string
+  pre_ptc_reply_submission_date: string | null
+}
 
-  const [rows, setRows] = useState<Row[]>([])
+// Display type with enriched data
+interface PreTenderClarificationDisplay extends PreTenderClarification {
+  company_name?: string
+  tender_no?: string
+  tender_description?: string
+}
+
+type ErrorDetail = { msg?: string; [key: string]: unknown }
+
+export default function PreTenderClarificationsPage() {
+  const API = process.env.NEXT_PUBLIC_BACKEND_API_URL
+  const [rows, setRows] = useState<PreTenderClarification[]>([])
+  const [enrichedRows, setEnrichedRows] = useState<PreTenderClarificationDisplay[]>([])
+  const [tenderingCompanies, setTenderingCompanies] = useState<TenderingCompany[]>([])
+  const [tenders, setTenders] = useState<Tender[]>([])
+  const [companies, setCompanies] = useState<Company[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [selectedPTC, setSelectedPTC] = useState<PreTenderClarificationDisplay | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false)
+  
+  const [formData, setFormData] = useState({
+    tender_id: '' as number | '',
+    company_id: '' as number | '',
+    pre_ptc_no: '',
+    pre_ptc_ref_no: '',
+    pre_ptc_date: '',
+    pre_ptc_received_date: '',
+    pre_ptc_sent_date: '',
+    pre_ptc_reply_submission_date: '',
+  })
 
   useEffect(() => {
+    fetchAllData()
+  }, [])
+
+  const fetchAllData = async () => {
     const token = localStorage.getItem('kkabbas_token')
+    if (!token) {
+      setError('Not authenticated')
+      setLoading(false)
+      return
+    }
+    
+    setLoading(true)
+    try {
+      const [ptcRes, tcRes, tenderRes, companyRes] = await Promise.all([
+        fetch(`${API}/pre_tender_clarification`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/tendering_companies`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/tender`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/company_master`, { headers: { Authorization: `Bearer ${token}` } }),
+      ])
 
-    Promise.all([
-      fetch(`${API}/pre_tender_clarification`, { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-      fetch(`${API}/tendering_companies`,        { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-      fetch(`${API}/tender`,                     { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-      fetch(`${API}/company_master`,             { headers: { Authorization: `Bearer ${token}` } }).then(r => r.json()),
-    ])
-      .then(([pre_ptcsRaw, tcsRaw, tendersRaw, companiesRaw]) => {
-        const pre_ptcs: pre_ptc[] = Array.isArray(pre_ptcsRaw) ? pre_ptcsRaw : (pre_ptcsRaw ? [pre_ptcsRaw] : [])
-        const tcs: TenderingCompany[] = Array.isArray(tcsRaw) ? tcsRaw : []
-        const tenders: Tender[] = Array.isArray(tendersRaw) ? tendersRaw : []
-        const companies: Company[] = Array.isArray(companiesRaw) ? companiesRaw : []
+      const [ptcData, tcData, tenderData, companyData] = await Promise.all([
+        ptcRes.json(),
+        tcRes.json(),
+        tenderRes.json(),
+        companyRes.json(),
+      ])
 
-        const tcById = new Map<number, TenderingCompany>(
-          tcs.map(tc => [tc.tendering_companies_id, tc])
-        )
-        const tenderById = new Map<number, Tender>(
-          tenders.map(t => [t.tender_id, t])
-        )
-        const companyById = new Map<number, Company>(
-          companies.map(c => [c.company_id, c])
-        )
+      const ptcs: PreTenderClarification[] = Array.isArray(ptcData) ? ptcData : []
+      const tcs: TenderingCompany[] = Array.isArray(tcData) ? tcData : []
+      const tendersArr: Tender[] = Array.isArray(tenderData) ? tenderData : []
+      const companiesArr: Company[] = Array.isArray(companyData) ? companyData : []
 
-        const merged: Row[] = pre_ptcs.map(p => {
-          const tc = tcById.get(p.tc_id)
-          const tender = tc ? tenderById.get(tc.tender_id) : undefined
-          const company = tc ? companyById.get(tc.company_id) : undefined
+      setRows(ptcs)
+      setTenderingCompanies(tcs)
+      setTenders(tendersArr)
+      setCompanies(companiesArr)
 
-          return {
-            ...p,
-            tender_no: tender?.tender_no || '',
-            tender_description: tender?.tender_description || '',
-            company_name: company?.company_name || '',
-          }
-        })
+      // Create maps for quick lookup
+      const companyMap = new Map<number, Company>()
+      companiesArr.forEach(c => companyMap.set(c.company_id, c))
 
-        setRows(merged)
+      const tenderMap = new Map<number, Tender>()
+      tendersArr.forEach(t => tenderMap.set(t.tender_id, t))
+
+      const tcMap = new Map<number, TenderingCompany>()
+      tcs.forEach(tc => tcMap.set(tc.tendering_companies_id, tc))
+
+      // Enrich PTCs with company and tender information
+      const enriched: PreTenderClarificationDisplay[] = ptcs.map(ptc => {
+        const tc = tcMap.get(ptc.tc_id)
+        const company = tc ? companyMap.get(tc.company_id) : null
+        const tender = tc ? tenderMap.get(tc.tender_id) : null
+
+        return {
+          ...ptc,
+          company_name: company?.company_name || 'Unknown Company',
+          tender_no: tender?.tender_no || 'Unknown Tender',
+          tender_description: tender?.tender_description || '',
+        }
       })
-      .catch(e => setError(e?.message || 'Failed to load'))
-      .finally(() => setLoading(false))
-  }, [API])
 
-  const sortedRows = useMemo(() => {
-    return [...rows].sort((a, b) => (b.pre_ptc_date || '').localeCompare(a.pre_ptc_date || ''))
-  }, [rows])
+      setEnrichedRows(enriched)
+    } catch (e: any) {
+      setError(e.message || 'Failed to load data')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  const columns: Column<Row>[] = [
-    { key: 'pre_ptc_no', header: 'pre_ptc No' },
-    { key: 'tender_no', header: 'Tender No' },
-    { key: 'tender_description', header: 'Tender Description' },
-    { key: 'company_name', header: 'Tenderer' },
-    { key: 'pre_ptc_ref_no', header: 'pre_ptc Ref No' },
-    { key: 'pre_ptc_date', header: 'pre_ptc Date' },
-    { key: 'pre_ptc_received_date', header: 'Received' },
-    { key: 'pre_ptc_reply_sent_date', header: 'Sent' },
+  // Get companies for a specific tender
+  const getCompaniesForTender = useMemo(() => {
+    if (!formData.tender_id) return []
+    
+    return tenderingCompanies
+      .filter(tc => tc.tender_id === formData.tender_id)
+      .map(tc => {
+        const company = companies.find(c => c.company_id === tc.company_id)
+        return {
+          tendering_companies_id: tc.tendering_companies_id,
+          company_id: tc.company_id,
+          company_name: company?.company_name || 'Unknown Company'
+        }
+      })
+  }, [formData.tender_id, tenderingCompanies, companies])
+
+  const getTenderingCompanyLabel = (tc_id: number): string => {
+    const tc = tenderingCompanies.find(t => t.tendering_companies_id === tc_id)
+    if (!tc) return 'Unknown'
+    
+    const company = companies.find(c => c.company_id === tc.company_id)
+    const tender = tenders.find(t => t.tender_id === tc.tender_id)
+    
+    const companyName = company?.company_name || 'Unknown Company'
+    const tenderNo = tender?.tender_no || 'Unknown Tender'
+    
+    return `${companyName} - ${tenderNo}`
+  }
+
+  const handleRowClick = (ptc: PreTenderClarificationDisplay) => {
+    const tenderingCompany = tenderingCompanies.find(tc => tc.tendering_companies_id === ptc.tc_id)
+    
+    setSelectedPTC(ptc)
+    setFormData({
+      tender_id: tenderingCompany?.tender_id || '',
+      company_id: tenderingCompany?.company_id || '',
+      pre_ptc_no: ptc.pre_ptc_no.toString(),
+      pre_ptc_ref_no: ptc.pre_ptc_ref_no,
+      pre_ptc_date: ptc.pre_ptc_date,
+      pre_ptc_received_date: ptc.pre_ptc_received_date,
+      pre_ptc_sent_date: ptc.pre_ptc_sent_date,
+      pre_ptc_reply_submission_date: ptc.pre_ptc_reply_submission_date || '',
+    })
+    setIsModalOpen(true)
+    setError(null)
+  }
+
+  const handleCreate = () => {
+    setSelectedPTC(null)
+    setFormData({
+      tender_id: '',
+      company_id: '',
+      pre_ptc_no: '',
+      pre_ptc_ref_no: '',
+      pre_ptc_date: '',
+      pre_ptc_received_date: '',
+      pre_ptc_sent_date: '',
+      pre_ptc_reply_submission_date: '',
+    })
+    setIsModalOpen(true)
+    setError(null)
+  }
+
+  const handleClose = () => {
+    setIsModalOpen(false)
+    setSelectedPTC(null)
+    setFormData({
+      tender_id: '',
+      company_id: '',
+      pre_ptc_no: '',
+      pre_ptc_ref_no: '',
+      pre_ptc_date: '',
+      pre_ptc_received_date: '',
+      pre_ptc_sent_date: '',
+      pre_ptc_reply_submission_date: '',
+    })
+    setError(null)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+
+    if (!formData.tender_id || !formData.company_id) {
+      setError('Please select both tender and company')
+      return
+    }
+
+    // Find the tendering_companies_id based on tender_id and company_id
+    const tenderingCompany = tenderingCompanies.find(
+      tc => tc.tender_id === formData.tender_id && tc.company_id === formData.company_id
+    )
+
+    if (!tenderingCompany) {
+      setError('Invalid tender and company combination')
+      return
+    }
+
+    setIsSaving(true)
+
+    const payload = {
+      tc_id: tenderingCompany.tendering_companies_id,
+      pre_ptc_no: Number(formData.pre_ptc_no),
+      pre_ptc_ref_no: formData.pre_ptc_ref_no,
+      pre_ptc_date: formData.pre_ptc_date,
+      pre_ptc_received_date: formData.pre_ptc_received_date,
+      pre_ptc_sent_date: formData.pre_ptc_sent_date,
+      pre_ptc_reply_submission_date: formData.pre_ptc_reply_submission_date || null,
+    }
+
+    console.log('Submitting payload:', payload)
+
+    try {
+      const url = selectedPTC
+        ? `${API}/pre_tender_clarification/${selectedPTC.pre_ptc_id}`
+        : `${API}/pre_tender_clarification`
+      
+      const method = selectedPTC ? 'PUT' : 'POST'
+
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}`,
+        },
+        body: JSON.stringify(payload),
+      })
+
+      if (response.ok) {
+        await fetchAllData()
+        handleClose()
+      } else {
+        const err = await response.json().catch(() => null)
+        const msg =
+          Array.isArray(err?.detail)
+            ? err.detail.map((d: ErrorDetail) => d.msg || JSON.stringify(d)).join(', ')
+            : typeof err?.detail === 'string'
+            ? err.detail
+            : 'Failed to save clarification'
+        setError(msg)
+      }
+    } catch (error) {
+      console.error('Error saving clarification:', error)
+      setError('An error occurred while saving')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!selectedPTC) return
+    
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete clarification "${selectedPTC.pre_ptc_ref_no}"? This action cannot be undone.`
+    )
+    
+    if (!confirmDelete) return
+    
+    setError(null)
+    setIsSaving(true)
+
+    try {
+      const response = await fetch(`${API}/pre_tender_clarification/${selectedPTC.pre_ptc_id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}`,
+        },
+      })
+
+      if (response.ok) {
+        await fetchAllData()
+        handleClose()
+      } else {
+        const err = await response.json().catch(() => null)
+        setError(err?.detail || 'Failed to delete clarification')
+      }
+    } catch (error) {
+      console.error('Error deleting clarification:', error)
+      setError('An error occurred while deleting')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Build JSON for full PTC listing report
+  const buildFullReportJson = () => {
+    const components: any[] = []
+
+    // Header
+    components.push({
+      type: "header",
+      style: {
+        wrapper: "px-0 py-2",
+        title: "text-3xl font-extrabold tracking-wide text-black center"
+      },
+      props: { text: "PRE TENDER CLARIFICATIONS REPORT" },
+    })
+
+    // Summary section
+    components.push({
+      type: "subheader",
+      props: { text: "Summary" }
+    })
+
+    components.push({
+      type: "table",
+      props: {
+        headers: ["Metric", "Value"],
+        rows: [
+          ["Total Clarifications", enrichedRows.length.toString()],
+          ["Report Generated", new Date().toLocaleDateString("en-IN", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+          })],
+        ],
+      },
+    })
+
+    // PTC listings
+    components.push({
+      type: "subheader",
+      props: { text: "Clarification Listings" }
+    })
+
+    const tableRows = enrichedRows.map(ptc => [
+      ptc.pre_ptc_id.toString(),
+      `${ptc.company_name} - ${ptc.tender_no}`,
+      ptc.pre_ptc_no.toString(),
+      ptc.pre_ptc_ref_no,
+      formatDate(ptc.pre_ptc_date),
+      formatDate(ptc.pre_ptc_received_date),
+      formatDate(ptc.pre_ptc_sent_date),
+      formatDate(ptc.pre_ptc_reply_submission_date),
+    ])
+
+    components.push({
+      type: "table",
+      props: {
+        headers: ["ID", "Tendering Company", "PTC No", "Ref No", "PTC Date", "Received", "Reply Required", "Reply Submitted"],
+        rows: tableRows,
+      },
+    })
+
+    return {
+      company: "Pre Tender Clarifications",
+      reportName: `PTC Report - ${new Date().toLocaleDateString()}`,
+      assets: {
+        backgroundImage: "https://ik.imagekit.io/pritvik/Reports%20-%20generic%20bg.png",
+      },
+      components,
+    }
+  }
+
+  // Build JSON for single PTC report
+  const buildSinglePTCReportJson = (ptc: PreTenderClarificationDisplay) => {
+    const components: any[] = []
+
+    // Header
+    components.push({
+      type: "header",
+      style: {
+        wrapper: "px-0 py-2",
+        title: "text-3xl font-extrabold tracking-wide text-black center"
+      },
+      props: { text: "PRE TENDER CLARIFICATION DETAILS" },
+    })
+
+    // PTC details
+    components.push({
+      type: "subheader",
+      props: { text: `PTC Ref: ${ptc.pre_ptc_ref_no}` }
+    })
+
+    components.push({
+      type: "table",
+      props: {
+        headers: ["Field", "Value"],
+        rows: [
+          ["PTC ID", ptc.pre_ptc_id.toString()],
+          ["Company", ptc.company_name || 'N/A'],
+          ["Tender", ptc.tender_no || 'N/A'],
+          ["Tender Description", ptc.tender_description || 'N/A'],
+          ["PTC No", ptc.pre_ptc_no.toString()],
+          ["PTC Ref No", ptc.pre_ptc_ref_no],
+          ["PTC Date", formatDate(ptc.pre_ptc_date)],
+          ["Received Date", formatDate(ptc.pre_ptc_received_date)],
+          ["Sent Date", formatDate(ptc.pre_ptc_sent_date)],
+          ["Reply Submission Date", formatDate(ptc.pre_ptc_reply_submission_date)],
+          ["Report Generated", new Date().toLocaleDateString("en-IN", {
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit"
+          })],
+        ],
+      },
+    })
+
+    return {
+      company: ptc.pre_ptc_ref_no,
+      reportName: `${ptc.pre_ptc_ref_no} - PTC Report`,
+      assets: {
+        backgroundImage: "https://ik.imagekit.io/pritvik/Reports%20-%20generic%20bg.png",
+      },
+      components,
+    }
+  }
+
+  // Generate report for all PTCs
+  const handleGenerateFullReport = async () => {
+    if (enrichedRows.length === 0) {
+      alert('No clarifications to generate report')
+      return
+    }
+
+    setIsGeneratingReport(true)
+    try {
+      const reportJson = buildFullReportJson()
+      await generatePDF(reportJson, 'download', 'pre-tender-clarifications-report.pdf')
+    } catch (error) {
+      console.error('Failed to generate report:', error)
+      alert('Failed to generate report. Please try again.')
+    } finally {
+      setIsGeneratingReport(false)
+    }
+  }
+
+  // Generate report for single PTC
+  const handleGenerateSingleReport = async () => {
+    if (!selectedPTC) return
+
+    setIsGeneratingReport(true)
+    try {
+      const reportJson = buildSinglePTCReportJson(selectedPTC)
+      await generatePDF(reportJson, 'download', `${selectedPTC.pre_ptc_ref_no.replace(/\s+/g, '-')}-report.pdf`)
+    } catch (error) {
+      console.error('Failed to generate report:', error)
+      alert('Failed to generate report. Please try again.')
+    } finally {
+      setIsGeneratingReport(false)
+    }
+  }
+
+  const formatDate = (dateStr: string | null): string => {
+    if (!dateStr) return 'N/A'
+    return new Date(dateStr).toLocaleDateString('en-GB')
+  }
+
+  // Create display type for table with formatted data
+  type PTCTableDisplay = {
+    pre_ptc_id: number
+    company_name: string
+    tender_no: string
+    pre_ptc_no: number
+    pre_ptc_ref_no: string
+    pre_ptc_date: string
+    pre_ptc_received_date: string
+    pre_ptc_sent_date: string
+    pre_ptc_reply_submission_date: string
+  }
+
+  const columns: Column<PTCTableDisplay>[] = [
+    { key: 'pre_ptc_id', header: 'ID' },
+    { key: 'company_name', header: 'Company' },
+    { key: 'tender_no', header: 'Tender' },
+    { key: 'pre_ptc_no', header: 'PTC No' },
+    { key: 'pre_ptc_ref_no', header: 'Ref No' },
+    { key: 'pre_ptc_date', header: 'PTC Date' },
+    { key: 'pre_ptc_received_date', header: 'Received Date' },
+    { key: 'pre_ptc_sent_date', header: 'Sent Date' },
+    { key: 'pre_ptc_reply_submission_date', header: 'Reply Submitted' },
   ]
+
+  const formattedRows: PTCTableDisplay[] = enrichedRows.map(row => ({
+    pre_ptc_id: row.pre_ptc_id,
+    company_name: row.company_name || 'Unknown Company',
+    tender_no: row.tender_no || 'Unknown Tender',
+    pre_ptc_no: row.pre_ptc_no,
+    pre_ptc_ref_no: row.pre_ptc_ref_no,
+    pre_ptc_date: formatDate(row.pre_ptc_date),
+    pre_ptc_received_date: formatDate(row.pre_ptc_received_date),
+    pre_ptc_sent_date: formatDate(row.pre_ptc_sent_date),
+    pre_ptc_reply_submission_date: formatDate(row.pre_ptc_reply_submission_date),
+  }))
 
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
         <h1 className="text-2xl font-bold">Pre Tender Clarifications</h1>
-        <button
-          onClick={() => router.push('/dashboard/pre_tender_clarification/create')}
-          className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700"
-        >
-          + Create
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={handleGenerateFullReport}
+            disabled={isGeneratingReport || enrichedRows.length === 0}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+          >
+            {isGeneratingReport && (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            )}
+            📊 Generate Report
+          </button>
+          <button
+            onClick={handleCreate}
+            className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700"
+          >
+            + Create
+          </button>
+        </div>
       </div>
 
       {loading ? (
-        <p>Loading…</p>
-      ) : error ? (
+        <Loader />
+      ) : error && !isModalOpen ? (
         <p className="text-red-600">{error}</p>
-      ) : sortedRows.length > 0 ? (
+      ) : enrichedRows.length ? (
         <CustomTable
-          data={sortedRows}
+          data={formattedRows}
           columns={columns}
           idField="pre_ptc_id"
-          linkPrefix="/dashboard/pre_tender_clarification"
+          onRowClick={(formattedRow) => {
+            const originalRow = enrichedRows.find(r => r.pre_ptc_id === formattedRow.pre_ptc_id)
+            if (originalRow) handleRowClick(originalRow)
+          }}
         />
       ) : (
         <p className="text-gray-600">No clarifications found.</p>
+      )}
+
+      {/* Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 backdrop-blur-sm bg-black/30"
+            onClick={handleClose}
+          />
+
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4 p-6 z-10 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold">
+                {selectedPTC ? 'Edit Pre Tender Clarification' : 'Create Pre Tender Clarification'}
+              </h2>
+              <button
+                onClick={handleClose}
+                className="text-gray-500 hover:text-gray-700 text-2xl leading-none"
+              >
+                &times;
+              </button>
+            </div>
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
+                {error}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit}>
+              <div className="space-y-4">
+                {/* Tender Selection */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tender *
+                  </label>
+                  <select
+                    value={formData.tender_id}
+                    onChange={(e) => {
+                      const tenderId = e.target.value === '' ? '' : Number(e.target.value)
+                      setFormData({
+                        ...formData,
+                        tender_id: tenderId,
+                        company_id: '', // Reset company selection when tender changes
+                      })
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    required
+                  >
+                    <option value="">-- Select Tender --</option>
+                    {tenders.map(tender => (
+                      <option key={tender.tender_id} value={tender.tender_id}>
+                        {tender.tender_no} - {tender.tender_description}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Company Selection - Only enabled if tender is selected */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Company *
+                  </label>
+                  <select
+                    value={formData.company_id}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        company_id: e.target.value === '' ? '' : Number(e.target.value)
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                    required
+                    disabled={!formData.tender_id}
+                  >
+                    <option value="">
+                      {formData.tender_id 
+                        ? '-- Select Company --' 
+                        : '-- Select Tender First --'}
+                    </option>
+                    {getCompaniesForTender.map(tc => (
+                      <option key={tc.tendering_companies_id} value={tc.company_id}>
+                        {tc.company_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      PTC No *
+                    </label>
+                    <input
+                      type="number"
+                      value={formData.pre_ptc_no}
+                      onChange={(e) =>
+                        setFormData({ ...formData, pre_ptc_no: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      PTC Ref No *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.pre_ptc_ref_no}
+                      onChange={(e) =>
+                        setFormData({ ...formData, pre_ptc_ref_no: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      PTC Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.pre_ptc_date}
+                      onChange={(e) =>
+                        setFormData({ ...formData, pre_ptc_date: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Received Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.pre_ptc_received_date}
+                      onChange={(e) =>
+                        setFormData({ ...formData, pre_ptc_received_date: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Sent Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.pre_ptc_sent_date}
+                      onChange={(e) =>
+                        setFormData({ ...formData, pre_ptc_sent_date: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Reply Submission Date
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.pre_ptc_reply_submission_date}
+                      onChange={(e) =>
+                        setFormData({ ...formData, pre_ptc_reply_submission_date: e.target.value })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center mt-6">
+                {/* Left side: Delete and Generate Report buttons */}
+                <div className="flex gap-2">
+                  {selectedPTC && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={handleDelete}
+                        disabled={isSaving}
+                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {isSaving && (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        )}
+                        Delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleGenerateSingleReport}
+                        disabled={isGeneratingReport}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {isGeneratingReport && (
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        )}
+                        📄 Report
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                {/* Right side: Cancel and Save buttons */}
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={handleClose}
+                    disabled={isSaving}
+                    className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSaving}
+                    className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-2"
+                  >
+                    {isSaving && (
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    )}
+                    {isSaving ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   )

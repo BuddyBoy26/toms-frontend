@@ -16,36 +16,37 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Order Management',
     items: [
       { label: 'Purchase Orders',    href: '/dashboard/order_detail' },
-      { label: 'Ordered Items',       href: '/dashboard/order_item_detail' },
+      // { label: 'Ordered Items',       href: '/dashboard/order_item_detail' },
       { label: 'Lot‑wise Monitoring', href: '/dashboard/lot_monitoring' },
-      { label: 'Drawing Details',     href: '/dashboard/drawing_details' }, // adjust if needed
+      { label: 'Delivery Procedure',          href: '/dashboard/delivery_procedure' },
+      // { label: 'Drawing Details',     href: '/dashboard/drawing_details' }, // adjust if needed
     ],
   },
-  {
-    title: 'Tasks',
-    items: [
-      { label: 'Important Dates & Time', href: '/dashboard/event' },
-      { label: 'Things to Do',           href: '/dashboard/things_to_do' },
-      { label: 'Delivery Monitoring',    href: '/dashboard/delivery_procedure' },
-    ],
-  },
-  {
-    title: 'Guarantees',
-    items: [
-      { label: 'Tender Bonds',          href: '/dashboard/tendering_companies' },
-      { label: 'Performance Bonds',     href: '/dashboard/performance_guarantee' },
-      { label: 'Material Performance',  href: '/dashboard/material_performance_guarantee' },
-    ],
-  },
+  // {
+  //   title: 'Tasks',
+  //   items: [
+  //     { label: 'Important Dates & Time', href: '/dashboard/event' },
+  //     { label: 'Things to Do',           href: '/dashboard/things_to_do' },
+  //     { label: 'Delivery Monitoring',    href: '/dashboard/delivery_procedure' },
+  //   ],
+  // },
+  // {
+  //   title: 'Guarantees',
+  //   items: [
+  //     { label: 'Tender Bonds',          href: '/dashboard/tender_bond_guarantee' },
+  //     { label: 'Performance Bonds',     href: '/dashboard/performance_guarantee' },
+  //     { label: 'Material Performance',  href: '/dashboard/material_performance_guarantee' },
+  //   ],
+  // },
   {
     title: 'Tendering',
     items: [
-      { label: 'Tendering Companies',       href: '/dashboard/tendering_companies' },
-      { label: 'Tendered Items',            href: '/dashboard/tender_company_item' },
+      { label: 'Tendering Company Details',       href: '/dashboard/tendering_company_details' },
+      // { label: 'Tendered Items',            href: '/dashboard/tender_company_item' },
       { label: 'Pre‑Tender Clarifications',  href: '/dashboard/pre_tender_clarification' },
       { label: 'Post‑Tender Clarifications', href: '/dashboard/post_tender_clarification' },
-      { label: 'Discounts Applied',         href: '/dashboard/liquidated_damages' },
-      { label: 'Tender Results',            href: '/dashboard/order_event' },
+      // { label: 'Discounts Applied',         href: '/dashboard/liquidated_damages' },
+      // { label: 'Tender Results',            href: '/dashboard/order_event' },
     ],
   },
   {
@@ -57,13 +58,13 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Tender Master',   href: '/dashboard/tender_master' },
     ],
   },
-  {
-    title: 'Miscellaneous',
-    items: [
-      { label: 'Discrepancies', href: '/dashboard/discrepancy' },
-      { label: 'Logs',          href: '/dashboard/order_event' },
-    ],
-  },
+  // {
+  //   title: 'Miscellaneous',
+  //   items: [
+  //     { label: 'Discrepancies', href: '/dashboard/discrepancy' },
+  //     { label: 'Logs',          href: '/dashboard/order_event' },
+  //   ],
+  // },
 ]
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {

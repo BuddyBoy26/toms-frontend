@@ -14,7 +14,8 @@ interface CustomTableProps<T extends object> {
   data: T[]
   columns: Column<T>[]
   idField: keyof T
-  linkPrefix: string
+  linkPrefix?: string
+  onRowClick?: (item: T) => void
 }
 
 export default function CustomTable<T extends object>({
@@ -22,6 +23,7 @@ export default function CustomTable<T extends object>({
   columns,
   idField,
   linkPrefix,
+  onRowClick,
 }: CustomTableProps<T>) {
   const router = useRouter()
 
@@ -35,6 +37,17 @@ export default function CustomTable<T extends object>({
     } else {
       setSortKey(key)
       setSortDir('asc')
+    }
+  }
+
+  const handleRowClickInternal = (item: T) => {
+    if (onRowClick) {
+      // If onRowClick is provided, use modal behavior
+      onRowClick(item)
+    } else if (linkPrefix) {
+      // Otherwise, use redirect behavior
+      const id = item[idField]
+      router.push(`${linkPrefix}/${id}`)
     }
   }
 
@@ -118,7 +131,7 @@ export default function CustomTable<T extends object>({
               <tr
                 key={String(id)}
                 className="hover:bg-gray-100 cursor-pointer"
-                onClick={() => router.push(`${linkPrefix}/${id}`)}
+                onClick={() => handleRowClickInternal(item)}
               >
                 {columns.map(col => (
                   <td

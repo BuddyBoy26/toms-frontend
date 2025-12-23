@@ -101,7 +101,7 @@ export default function CreateOrderItemPage() {
             </select>
           </div>
           <div>
-            <label className={labelCls}>Item</label>
+            <label className={labelCls}>Item Description</label>
             <select className={fieldCls} value={itemId} onChange={e=>setItemId(e.target.value ? Number(e.target.value) : '')} required>
               <option value="">Select item</option>
               {items.map(i => (
