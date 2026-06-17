@@ -15,6 +15,7 @@ interface Tender {
   tender_description: string;
   tender_value: number | null;
   currency: CurrencyEnum;
+  bond_guarantee_amt: number | null;
 }
 interface Product { product_id: number; product_name: string }
 
@@ -31,6 +32,7 @@ interface TenderingCompany {
   tbg_issuing_bank: string | null
   tender_deposit_receipt_no: string | null
   tendering_currency: CurrencyEnum
+  tendering_currency_nq: CurrencyEnum
   credit_card_payment_ref: string | null
   remarks: string | null
   tbg_value: number | null
@@ -41,10 +43,14 @@ interface TenderingCompany {
   tbg_release_date_bank: string | null
   dewa_enbd_ref: string | null
   tender_extension_dates: string[] | null
+  
+  // These are kept in the interface for type safety, 
+  // but we pull actual CG data directly from the counter_guarantee table
   cg_bank: string | null
   cg_no: string | null
   cg_date: string | null
   cg_expiry_date: string | null
+  
   delivery_commencement_weeks: number | null
   delivery_completion_weeks: number | null
   tender_bought: 0 | 1
@@ -141,6 +147,7 @@ export default function TenderingCompanyEditPage() {
     tbg_issuing_bank: '',
     tender_deposit_receipt_no: '',
     tendering_currency: 'AED' as CurrencyEnum,
+    tendering_currency_nq: 'AED' as CurrencyEnum,
     credit_card_payment_ref: '',
     remarks: '',
     
@@ -154,10 +161,13 @@ export default function TenderingCompanyEditPage() {
     
     tender_extension_dates: [] as string[],
     
-    cg_bank: '',
-    cg_no: '',
+    // Real Counter Guarantee Form State
+    cg_id: null as number | null,
+    cg_issuing_bank: '',
     cg_date: '',
     cg_expiry_date: '',
+    cg_status: 'NOT Issued',
+    cg_remarks: '',
     
     delivery_commencement_weeks: '',
     delivery_completion_weeks: '',
@@ -182,7 +192,7 @@ export default function TenderingCompanyEditPage() {
   // Get tender currency from selected tender
   const tenderCurrency = useMemo(() => {
     const selectedTender = tenders.find(t => t.tender_id === formData.tender_id)
-    return selectedTender?.currency || 'AED'
+    return selectedTender?.currency_nq || 'AED'
   }, [formData.tender_id, tenders])
 
   // Get company and tender names for display
@@ -204,43 +214,54 @@ export default function TenderingCompanyEditPage() {
     
     Promise.all([
       fetch(`${API}/tendering_companies/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`${API}/counter_guarantee`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch(`${API}/tender`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch(`${API}/company_master`, { headers: { Authorization: `Bearer ${token}` } }),
       fetch(`${API}/product_master`, { headers: { Authorization: `Bearer ${token}` } }),
     ])
-      .then(([tcRes, tendRes, compRes, prodRes]) => Promise.all([tcRes.json(), tendRes.json(), compRes.json(), prodRes.json()]))
-      .then(([tcData, tenderData, companyData, productData]) => {
+      .then(([tcRes, cgRes, tendRes, compRes, prodRes]) => Promise.all([tcRes.json(), cgRes.json(), tendRes.json(), compRes.json(), prodRes.json()]))
+      .then(([tcData, cgData, tenderData, companyData, productData]) => {
         const tc = tcData as TenderingCompany
+        const cgs = Array.isArray(cgData) ? cgData : []
+        const tender = tenderData as Tender[]
         setOriginalTenderingCompany(tc)
 
-        console.log("Fetched Tendering Company:", tc)
+        // Find associated real CG
+        const refNo = tc.tbg_credit_card_option === 0 ? tc.tbg_no : tc.credit_card_payment_ref
+        const matchedCG = cgs.find((c: any) => c.guarantee_type === 'TBG' && c.guarantee_ref_number === refNo)
         
         setFormData({
           company_id: tc.company_id,
           tender_id: tc.tender_id,
           tender_receipt_no: tc.tender_receipt_no || '',
           debit_advice_no: tc.debit_advice_no || '',
-          debit_advice_date: tc.debit_advice_date || '',
-          tender_value: tc.tender_value ? formatNumber(tc.tender_value) : '',
+          debit_advice_date: tc.debit_advice_date ? tc.debit_advice_date.split('T')[0] : '',
+          tender_value: tc.tender_value ? formatNumber(tc.tender_value) : formatNumber(tender.find(t => t.tender_id === tc.tender_id)?.bond_guarantee_amt || 0),
           tbg_credit_card_option: tc.tbg_credit_card_option || 0,
           tbg_no: tc.tbg_no || '',
           tbg_issuing_bank: tc.tbg_issuing_bank || '',
           tender_deposit_receipt_no: tc.tender_deposit_receipt_no || '',
           tendering_currency: tc.tendering_currency,
+          tendering_currency_nq: tc.tendering_currency_nq || 'AED',
           credit_card_payment_ref: tc.credit_card_payment_ref || '',
           remarks: tc.remarks || '',
           tbg_value: tc.tbg_value ? formatNumber(tc.tbg_value) : '',
-          tbg_date: tc.tbg_date || '',
-          tbg_expiry_date: tc.tbg_expiry_date || '',
-          tbg_submitted_date: tc.tbg_submitted_date || '',
-          tbg_release_date_dewa: tc.tbg_release_date_dewa || '',
-          tbg_release_date_bank: tc.tbg_release_date_bank || '',
+          tbg_date: tc.tbg_date ? tc.tbg_date.split('T')[0] : '',
+          tbg_expiry_date: tc.tbg_expiry_date ? tc.tbg_expiry_date.split('T')[0] : '',
+          tbg_submitted_date: tc.tbg_submitted_date ? tc.tbg_submitted_date.split('T')[0] : '',
+          tbg_release_date_dewa: tc.tbg_release_date_dewa ? tc.tbg_release_date_dewa.split('T')[0] : '',
+          tbg_release_date_bank: tc.tbg_release_date_bank ? tc.tbg_release_date_bank.split('T')[0] : '',
           dewa_enbd_ref: tc.dewa_enbd_ref || '',
           tender_extension_dates: tc.tender_extension_dates || [],
-          cg_bank: tc.cg_bank || '',
-          cg_no: tc.cg_no || '',
-          cg_date: tc.cg_date || '',
-          cg_expiry_date: tc.cg_expiry_date || '',
+          
+          // Map real CG data
+          cg_id: matchedCG ? matchedCG.cg_id : null,
+          cg_issuing_bank: matchedCG?.issuing_bank || '',
+          cg_date: matchedCG?.cg_date ? matchedCG.cg_date.split('T')[0] : '',
+          cg_expiry_date: matchedCG?.expiry_date ? matchedCG.expiry_date.split('T')[0] : '',
+          cg_status: matchedCG?.pending_status || 'NOT Issued',
+          cg_remarks: matchedCG?.remarks || '',
+          
           delivery_commencement_weeks: tc.delivery_commencement_weeks ? String(tc.delivery_commencement_weeks) : '',
           delivery_completion_weeks: tc.delivery_completion_weeks ? String(tc.delivery_completion_weeks) : '',
           tender_bought: tc.tender_bought == 1,
@@ -262,16 +283,16 @@ export default function TenderingCompanyEditPage() {
   // Auto-populate tender value and currency when tender is selected
   const handleTenderChange = (tenderId: string) => {
     const tenderIdNum = tenderId === '' ? '' : Number(tenderId)
-    setFormData({ ...formData, tender_id: tenderIdNum })
     
     if (tenderId !== '') {
       const selectedTender = tenders.find(t => t.tender_id === Number(tenderId))
+      console.log("Selected Tender:", selectedTender)
       if (selectedTender) {
         setFormData({
           ...formData,
           tender_id: tenderIdNum,
-          tender_value: selectedTender.tender_value ? formatNumber(String(selectedTender.tender_value)) : '',
-          tendering_currency: selectedTender.currency || 'AED'
+          tender_value: selectedTender.bond_guarantee_amt ? formatNumber(String(selectedTender.bond_guarantee_amt)) : '',
+          tendering_currency: selectedTender.currency || 'AED',
         })
       }
     }
@@ -402,18 +423,19 @@ export default function TenderingCompanyEditPage() {
       })
     }
 
-    // Counter Guarantee Details
-    if (originalTenderingCompany.cg_bank || originalTenderingCompany.cg_no) {
+    // Counter Guarantee Details (Fetching from Form State for accuracy)
+    if (formData.cg_issuing_bank || formData.cg_date || formData.cg_expiry_date || formData.cg_remarks) {
       components.push({
         type: "subheader",
         props: { text: "Counter Guarantee Details" }
       })
 
       const cgRows: string[][] = []
-      if (originalTenderingCompany.cg_bank) cgRows.push(["CG Bank", originalTenderingCompany.cg_bank])
-      if (originalTenderingCompany.cg_no) cgRows.push(["CG No", originalTenderingCompany.cg_no])
-      if (originalTenderingCompany.cg_date) cgRows.push(["CG Date", formatDate(originalTenderingCompany.cg_date)])
-      if (originalTenderingCompany.cg_expiry_date) cgRows.push(["CG Expiry Date", formatDate(originalTenderingCompany.cg_expiry_date)])
+      if (formData.cg_issuing_bank) cgRows.push(["Issuing Bank", formData.cg_issuing_bank])
+      if (formData.cg_date) cgRows.push(["CG Date", formatDate(formData.cg_date)])
+      if (formData.cg_expiry_date) cgRows.push(["CG Expiry Date", formatDate(formData.cg_expiry_date)])
+      cgRows.push(["Status", formData.cg_status])
+      if (formData.cg_remarks) cgRows.push(["Remarks", formData.cg_remarks])
 
       if (cgRows.length > 0) {
         components.push({
@@ -538,7 +560,7 @@ export default function TenderingCompanyEditPage() {
 
     setSaving(true)
 
-    const payload = {
+    const tcPayload = {
       company_id: Number(formData.company_id),
       tender_id: Number(formData.tender_id),
       
@@ -553,6 +575,7 @@ export default function TenderingCompanyEditPage() {
       tbg_issuing_bank: formData.tbg_issuing_bank || null,
       tender_deposit_receipt_no: formData.tender_deposit_receipt_no || null,
       tendering_currency: formData.tendering_currency,
+      tendering_currency_nq: formData.tendering_currency_nq,
       credit_card_payment_ref: formData.credit_card_payment_ref || null,
       remarks: formData.remarks || null,
       
@@ -566,10 +589,11 @@ export default function TenderingCompanyEditPage() {
       
       tender_extension_dates: formData.tender_extension_dates.length > 0 ? formData.tender_extension_dates : null,
       
-      cg_bank: formData.cg_bank || null,
-      cg_no: formData.cg_no || null,
-      cg_date: formData.cg_date || null,
-      cg_expiry_date: formData.cg_expiry_date || null,
+      // Kept null to cleanly satisfy legacy schema expectations
+      cg_bank: null,
+      cg_no: null,
+      cg_date: null,
+      cg_expiry_date: null,
       
       delivery_commencement_weeks: formData.delivery_commencement_weeks ? Number(formData.delivery_commencement_weeks) : null,
       delivery_completion_weeks: formData.delivery_completion_weeks ? Number(formData.delivery_completion_weeks) : null,
@@ -582,27 +606,64 @@ export default function TenderingCompanyEditPage() {
       po_copies: formData.po_copies ? 1 : 0,
     }
 
-    console.log("Submitting payload:", payload)
-
     try {
+      // 1. Update Main Tendering Company
       const response = await fetch(`${API}/tendering_companies/${id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}`,
         },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(tcPayload),
       })
 
-      if (response.ok) {
-        router.push('/dashboard/tendering_company_details')
-      } else {
+      if (!response.ok) {
         const err = await response.json().catch(() => null)
-        setError(err?.detail || 'Failed to update tendering company')
+        throw new Error(err?.detail || 'Failed to update tendering company')
       }
-    } catch (error) {
+
+      // 2. Safely Process Counter Guarantee
+      const refNo = formData.tbg_credit_card_option === 0 ? formData.tbg_no : formData.credit_card_payment_ref
+      
+      if (refNo) {
+        const cgPayload = {
+          guarantee_type: 'TBG',
+          guarantee_ref_number: refNo,
+          cg_date: formData.cg_date || null,
+          issuing_bank: formData.cg_issuing_bank || null,
+          expiry_date: formData.cg_expiry_date || null,
+          remarks: formData.cg_remarks || null,
+          pending_status: formData.cg_status
+        }
+
+        // If ID exists, PUT. If no ID but data is filled, POST.
+        if (formData.cg_id) {
+          const cgResponse = await fetch(`${API}/counter_guarantee/${formData.cg_id}`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}`,
+            },
+            body: JSON.stringify(cgPayload),
+          })
+          if (!cgResponse.ok) console.warn("Failed to update Counter Guarantee")
+        } else if (formData.cg_issuing_bank || formData.cg_date || formData.cg_expiry_date || formData.cg_remarks || formData.cg_status !== 'NOT Issued') {
+          const cgResponse = await fetch(`${API}/counter_guarantee`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}`,
+            },
+            body: JSON.stringify(cgPayload),
+          })
+          if (!cgResponse.ok) console.warn("Failed to create Counter Guarantee")
+        }
+      }
+
+      router.push('/dashboard/tendering_company_details')
+    } catch (error: any) {
       console.error('Error:', error)
-      setError('An error occurred while saving')
+      setError(error.message || 'An error occurred while saving')
     } finally {
       setSaving(false)
     }
@@ -701,22 +762,39 @@ export default function TenderingCompanyEditPage() {
 
             {/* Tender Value and Currency - As Per Tenderer */}
             <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Tender Value (As Per Tenderer)</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tender Bond Value</label>
                 <input
                   type="text"
                   value={formData.tender_value}
                   onChange={(e) => handleAmountChange(e.target.value, 'tender_value')}
                   placeholder="0.00"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-100"
+                  readOnly
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Currency</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tender Bond Currency</label>
                 <select
                   value={formData.tendering_currency}
                   onChange={(e) => setFormData({ ...formData, tendering_currency: e.target.value as CurrencyEnum })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="AED">AED</option>
+                  <option value="EUR">EUR</option>
+                  <option value="USD">USD</option>
+                </select>
+              </div>
+
+              </div>
+            
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tendering Currency</label>
+                <select
+                  value={formData.tendering_currency_nq}
+                  onChange={(e) => setFormData({ ...formData, tendering_currency_nq: e.target.value as CurrencyEnum })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                 >
                   <option value="AED">AED</option>
@@ -792,7 +870,7 @@ export default function TenderingCompanyEditPage() {
                     onChange={(e) => setFormData({ ...formData, evaluations_received: e.target.checked })}
                     className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500"
                   />
-                  <span className="text-sm text-gray-700">Evaluations Received</span>
+                  <span className="text-sm text-gray-700">Evaluations</span>
                 </label>
 
                 <label className="flex items-center gap-2">
@@ -855,7 +933,12 @@ export default function TenderingCompanyEditPage() {
                     <input
                       type="text"
                       value={formData.tbg_no}
-                      onChange={(e) => setFormData({ ...formData, tbg_no: e.target.value })}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          tbg_no: e.target.value.toUpperCase()
+                        })
+                      }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
@@ -1055,33 +1138,22 @@ export default function TenderingCompanyEditPage() {
           )}
         </div>
 
-        {/* Counter Guarantee */}
+        {/* Real Counter Guarantee Details */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <h2 className="text-lg font-semibold mb-3">Counter Guarantee Details</h2>
           <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CG Bank</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Issuing Bank</label>
                 <input
                   type="text"
-                  value={formData.cg_bank}
-                  onChange={(e) => setFormData({ ...formData, cg_bank: e.target.value })}
+                  value={formData.cg_issuing_bank}
+                  onChange={(e) => setFormData({ ...formData, cg_issuing_bank: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="CG Bank Name"
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CG No</label>
-                <input
-                  type="text"
-                  value={formData.cg_no}
-                  onChange={(e) => setFormData({ ...formData, cg_no: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">CG Date</label>
                 <input
@@ -1093,7 +1165,7 @@ export default function TenderingCompanyEditPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">CG Expiry Date</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
                 <input
                   type="date"
                   value={formData.cg_expiry_date}
@@ -1101,6 +1173,32 @@ export default function TenderingCompanyEditPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select
+                  value={formData.cg_status}
+                  onChange={(e) => setFormData({ ...formData, cg_status: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option value="NOT Issued">NOT Issued</option>
+                  <option value="Issued / Extended">Issued / Extended</option>
+                  <option value="Extension Required">Extension Required</option>
+                  <option value="NOT Released">NOT Released</option>
+                  <option value="Released">Released</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+              <textarea
+                value={formData.cg_remarks}
+                onChange={(e) => setFormData({ ...formData, cg_remarks: e.target.value })}
+                rows={2}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Any CG remarks..."
+              />
             </div>
           </div>
         </div>
@@ -1110,7 +1208,7 @@ export default function TenderingCompanyEditPage() {
           <TenderCompanyItemsTable
             tenderingCompanyId={Number(id)}
             productId={currentProductId}
-            tenderCurrency={tenderCurrency}
+            tenderCurrency={formData.tendering_currency_nq}
           />
         </div>
 

@@ -16,9 +16,10 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Order Management',
     items: [
       { label: 'Purchase Orders',    href: '/dashboard/order_detail' },
-      // { label: 'Ordered Items',       href: '/dashboard/order_item_detail' },
       { label: 'Lot‑wise Monitoring', href: '/dashboard/lot_monitoring' },
+      { label: 'Guarantees',       href: '/dashboard/guarantees' },
       { label: 'Delivery Procedure',          href: '/dashboard/delivery_procedure' },
+      { label: 'Discrepancies', href: '/dashboard/discrepancy' },
       // { label: 'Drawing Details',     href: '/dashboard/drawing_details' }, // adjust if needed
     ],
   },
@@ -41,7 +42,7 @@ const NAV_GROUPS: NavGroup[] = [
   {
     title: 'Tendering',
     items: [
-      { label: 'Tendering Company Details',       href: '/dashboard/tendering_company_details' },
+      { label: 'Tendering Company and Tendering Details',       href: '/dashboard/tendering_company_details' },
       // { label: 'Tendered Items',            href: '/dashboard/tender_company_item' },
       { label: 'Pre‑Tender Clarifications',  href: '/dashboard/pre_tender_clarification' },
       { label: 'Post‑Tender Clarifications', href: '/dashboard/post_tender_clarification' },
@@ -61,8 +62,8 @@ const NAV_GROUPS: NavGroup[] = [
   // {
   //   title: 'Miscellaneous',
   //   items: [
-  //     { label: 'Discrepancies', href: '/dashboard/discrepancy' },
-  //     { label: 'Logs',          href: '/dashboard/order_event' },
+      
+  //     // { label: 'Logs',          href: '/dashboard/order_event' },
   //   ],
   // },
 ]
@@ -70,7 +71,7 @@ const NAV_GROUPS: NavGroup[] = [
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter()
   const path = usePathname()
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({})
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({"Masters": true, "Miscellaneous": true, "Order Management": true, "Tendering": true})
 
   useEffect(() => {
     if (!localStorage.getItem('kkabbas_token')) {
@@ -79,10 +80,12 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   }, [router])
 
   const toggleGroup = (title: string) => {
+
     setOpenGroups(prev => ({
       ...prev,
       [title]: !prev[title],
     }))
+
   }
 
   return (

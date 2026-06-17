@@ -641,7 +641,7 @@ export default function OrderDetailEditPage() {
             <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Order Value (Auto-populated) *
+                  Order Value
                 </label>
                 <input
                   type="text"
@@ -655,7 +655,7 @@ export default function OrderDetailEditPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Currency (Auto-populated) *
+                  Currency (Auto-populated)
                 </label>
                 <input
                   type="text"
@@ -667,7 +667,7 @@ export default function OrderDetailEditPage() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Order Value (AED) *
+                  Order Value (AED)
                 </label>
                 <input
                   type="text"

@@ -176,7 +176,7 @@ export default function PreTenderClarificationsPage() {
       tender_id: tenderingCompany?.tender_id || '',
       company_id: tenderingCompany?.company_id || '',
       pre_ptc_no: ptc.pre_ptc_no.toString(),
-      pre_ptc_ref_no: ptc.pre_ptc_ref_no,
+      pre_ptc_ref_no: ptc.pre_ptc_ref_no.toUpperCase(),
       pre_ptc_date: ptc.pre_ptc_date,
       pre_ptc_received_date: ptc.pre_ptc_received_date,
       pre_ptc_sent_date: ptc.pre_ptc_sent_date,
@@ -242,7 +242,7 @@ export default function PreTenderClarificationsPage() {
     const payload = {
       tc_id: tenderingCompany.tendering_companies_id,
       pre_ptc_no: Number(formData.pre_ptc_no),
-      pre_ptc_ref_no: formData.pre_ptc_ref_no,
+      pre_ptc_ref_no: formData.pre_ptc_ref_no.toUpperCase(),
       pre_ptc_date: formData.pre_ptc_date,
       pre_ptc_received_date: formData.pre_ptc_received_date,
       pre_ptc_sent_date: formData.pre_ptc_sent_date,
@@ -525,7 +525,7 @@ export default function PreTenderClarificationsPage() {
     pre_ptc_date: formatDate(row.pre_ptc_date),
     pre_ptc_received_date: formatDate(row.pre_ptc_received_date),
     pre_ptc_sent_date: formatDate(row.pre_ptc_sent_date),
-    pre_ptc_reply_submission_date: formatDate(row.pre_ptc_reply_submission_date),
+    pre_ptc_reply_submission_date: row.pre_ptc_reply_submission_date ? formatDate(row.pre_ptc_reply_submission_date) : 'NO',
   }))
 
   return (
@@ -545,7 +545,7 @@ export default function PreTenderClarificationsPage() {
           </button>
           <button
             onClick={handleCreate}
-            className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700"
+            className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700 active:scale-95"
           >
             + Create
           </button>
@@ -680,7 +680,7 @@ export default function PreTenderClarificationsPage() {
                       type="text"
                       value={formData.pre_ptc_ref_no}
                       onChange={(e) =>
-                        setFormData({ ...formData, pre_ptc_ref_no: e.target.value })
+                        setFormData({ ...formData, pre_ptc_ref_no: e.target.value.toUpperCase() })
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                       required

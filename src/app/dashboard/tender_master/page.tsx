@@ -20,6 +20,7 @@ interface Tender {
   tender_type: TenderType
   supply_product_id?: number | null
   extension_dates?: string[] | null
+  [key: string]: any // Added to catch potential API key variations
 }
 
 interface Product {
@@ -70,21 +71,15 @@ export default function TenderListPage() {
   
   const [formData, setFormData] = useState({
     tender_no: '',
+    tender_description: '',
     tender_type: 'public' as TenderType,
-    supply_product_id: '' as number | '',
+    supply_product_id: '' as number | string,
     tender_date: '',
     closing_date: '',
     bond_guarantee_amt: '',
     tender_fees: '',
     currency: 'AED',
   })
-
-  // Auto-generate tender description based on selected product
-  const tenderDescription = useMemo(() => {
-    if (formData.supply_product_id === '') return ''
-    const product = products.find(p => p.product_id === Number(formData.supply_product_id))
-    return product ? `SUPPLY OF ${product.product_name.toUpperCase()}` : ''
-  }, [formData.supply_product_id, products])
 
   // Validate dates
   const dateValidation = useMemo(() => {
@@ -103,7 +98,7 @@ export default function TenderListPage() {
   }, [formData.tender_date, formData.closing_date])
 
   const canSubmit = useMemo(() => {
-    if (!formData.tender_no.trim() || !formData.supply_product_id) return false
+    if (!formData.tender_no.trim() || !formData.supply_product_id || !formData.tender_description.trim()) return false
     if (!formData.tender_date || !formData.closing_date) return false
     return dateValidation.valid
   }, [formData, dateValidation])
@@ -129,7 +124,7 @@ export default function TenderListPage() {
         if (!r.ok) throw new Error(`Failed to load tenders (${r.status})`)
         return r.json()
       })
-      .then((data: Tender[]) => setRows(Array.isArray(data) ? data : []))
+      .then((data: Tender[]) => setRows(Array.isArray(data) ? data.sort((a, b) => a.tender_id - b.tender_id) : []))
       .catch(e => setError(e.message))
       .finally(() => setLoading(false))
   }
@@ -139,20 +134,40 @@ export default function TenderListPage() {
       headers: { Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}` },
     })
       .then(r => r.json())
-      .then((data: Product[]) => setProducts(Array.isArray(data) ? data : []))
+      .then((data: Product[]) => setProducts(Array.isArray(data) ? data.sort((a, b) => a.product_id - b.product_id) : []))
   }
 
   const handleRowClick = (tender: Tender) => {
     setSelectedTender(tender)
+    
+    // Reverse-engineer the Product ID from the description text
+    let derivedProductId: string | number = ''
+    const descPrefix = "SUPPLY OF "
+
+    if (tender.tender_description && tender.tender_description.toUpperCase().startsWith(descPrefix)) {
+      // Extract the product name by removing "SUPPLY OF "
+      const extractedName = tender.tender_description.substring(descPrefix.length).trim().toUpperCase()
+      
+      // Find the matching product in our loaded products array
+      const matchedProduct = products.find(p => p.product_name.toUpperCase() === extractedName)
+      if (matchedProduct) {
+        derivedProductId = matchedProduct.product_id
+      }
+    }
+    
+    // Fallback chain: Reverse-Engineered ID -> API supply_product_id -> API product_id -> empty string
+    const finalProductId = derivedProductId || tender.supply_product_id || tender.product_id || tender.productId || ''
+
     setFormData({
-      tender_no: tender.tender_no,
-      tender_type: tender.tender_type,
-      supply_product_id: tender.supply_product_id || '',
+      tender_no: tender.tender_no || '',
+      tender_description: tender.tender_description || '',
+      tender_type: tender.tender_type || 'public',
+      supply_product_id: finalProductId,
       tender_date: tender.tender_date || '',
       closing_date: tender.closing_date || '',
       bond_guarantee_amt: tender.bond_guarantee_amt ? formatNumber(tender.bond_guarantee_amt) : '',
       tender_fees: tender.tender_fees ? formatNumber(tender.tender_fees) : '',
-      currency: tender.currency,
+      currency: tender.currency || 'AED',
     })
     setIsModalOpen(true)
     setError(null)
@@ -162,6 +177,7 @@ export default function TenderListPage() {
     setSelectedTender(null)
     setFormData({
       tender_no: '',
+      tender_description: '',
       tender_type: 'public',
       supply_product_id: '',
       tender_date: '',
@@ -179,6 +195,7 @@ export default function TenderListPage() {
     setSelectedTender(null)
     setFormData({
       tender_no: '',
+      tender_description: '',
       tender_type: 'public',
       supply_product_id: '',
       tender_date: '',
@@ -208,7 +225,7 @@ export default function TenderListPage() {
 
     const payload = {
       tender_no: formData.tender_no,
-      tender_description: tenderDescription,
+      tender_description: formData.tender_description,
       tender_type: formData.tender_type,
       supply_product_id: Number(formData.supply_product_id),
       tender_date: formData.tender_date,
@@ -216,8 +233,9 @@ export default function TenderListPage() {
       bond_guarantee_amt: parseFormattedNumber(formData.bond_guarantee_amt),
       tender_fees: parseFormattedNumber(formData.tender_fees),
       currency: formData.currency,
-      
     }
+
+    console.log(payload)
 
     try {
       const url = selectedTender
@@ -304,9 +322,9 @@ export default function TenderListPage() {
   }, [products])
 
   // Get product name by ID
-  const getProductName = (productId: number | null | undefined): string => {
+  const getProductName = (productId: number | string | null | undefined): string => {
     if (!productId) return 'N/A'
-    return productMap.get(productId) || 'Unknown Product'
+    return productMap.get(Number(productId)) || 'Unknown Product'
   }
 
   // Build JSON for full tender listing report
@@ -415,7 +433,7 @@ export default function TenderListPage() {
           ["Tender ID", tender.tender_id.toString()],
           ["Tender Number", tender.tender_no],
           ["Description", tender.tender_description],
-          ["Product", getProductName(tender.supply_product_id)],
+          ["Product", getProductName(tender.supply_product_id || tender.product_id)],
           ["Type", tender.tender_type.charAt(0).toUpperCase() + tender.tender_type.slice(1)],
           ["Invitation Date", tender.tender_date || 'N/A'],
           ["Closing Date", tender.closing_date || 'N/A'],
@@ -494,7 +512,7 @@ export default function TenderListPage() {
     ...row,
     tender_fees: renderAmount(row.tender_fees) as any,
     bond_guarantee_amt: renderAmount(row.bond_guarantee_amt) as any,
-  }))
+  })).sort((a, b) => a.tender_id - b.tender_id)
 
   return (
     <div>
@@ -513,7 +531,7 @@ export default function TenderListPage() {
           </button>
           <button
             onClick={handleCreate}
-            className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700"
+            className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700 active:scale-95"
           >
             + Create
           </button>
@@ -587,23 +605,50 @@ export default function TenderListPage() {
                     Product *
                   </label>
                   <select
-                    value={formData.supply_product_id}
-                    onChange={(e) =>
+                    value={formData.supply_product_id ? String(formData.supply_product_id) : ''}
+                    onChange={(e) => {
+                      const selectedId = e.target.value === '' ? '' : Number(e.target.value)
+                      let autoDesc = formData.tender_description
+
+                      if (selectedId !== '') {
+                        const product = products.find(p => p.product_id === selectedId)
+                        if (product) {
+                          autoDesc = `SUPPLY OF ${product.product_name.toUpperCase()}`
+                        }
+                      } else {
+                        autoDesc = ''
+                      }
+
                       setFormData({
                         ...formData,
-                        supply_product_id: e.target.value === '' ? '' : Number(e.target.value)
+                        supply_product_id: selectedId,
+                        tender_description: autoDesc
                       })
-                    }
+                    }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                     required
                   >
                     <option value="">-- Select Product --</option>
                     {products.map(p => (
-                      <option key={p.product_id} value={p.product_id}>
+                      <option key={p.product_id} value={String(p.product_id)}>
                         {p.product_name}
                       </option>
                     ))}
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Tender Description *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.tender_description}
+                    onChange={(e) => setFormData({ ...formData, tender_description: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Enter tender description"
+                    required
+                  />
                 </div>
 
                 <div>
@@ -620,19 +665,6 @@ export default function TenderListPage() {
                     <option value="public">Public</option>
                     <option value="selected">Selected</option>
                   </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Tender Description (Auto-generated)
-                  </label>
-                  <input
-                    type="text"
-                    value={tenderDescription}
-                    readOnly
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600 cursor-not-allowed"
-                    placeholder="Select a product to generate description"
-                  />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -677,15 +709,15 @@ export default function TenderListPage() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Currency
                     </label>
-                                    <select
-                  value={formData.currency}
-                  onChange={e => setFormData({ ...formData, currency: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
-                >
-                  <option value="AED">AED</option>
-                  <option value="USD">USD</option>
-                  <option value="EUR">EUR</option>
-                </select>
+                    <select
+                      value={formData.currency}
+                      onChange={e => setFormData({ ...formData, currency: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                    >
+                      <option value="AED">AED</option>
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                    </select>
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -715,38 +747,7 @@ export default function TenderListPage() {
               </div>
 
               <div className="flex justify-between items-center mt-6">
-                {/* Left side: Delete and Generate Report buttons */}
-                <div className="flex gap-2">
-                  {selectedTender && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={handleDelete}
-                        disabled={isSaving}
-                        className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-2"
-                      >
-                        {isSaving && (
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        )}
-                        Delete
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleGenerateSingleReport}
-                        disabled={isGeneratingReport}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
-                      >
-                        {isGeneratingReport && (
-                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        )}
-                        📄 Report
-                      </button>
-                    </>
-                  )}
-                </div>
-
-                {/* Right side: Cancel and Save buttons */}
-                <div className="flex gap-3">
+                <div className="flex gap-3 ml-auto">
                   <button
                     type="button"
                     onClick={handleClose}

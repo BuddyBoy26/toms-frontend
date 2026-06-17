@@ -259,7 +259,7 @@ export default function PtcCreatePage() {
             <input
               className="mt-1 w-full rounded-md border px-3 py-2"
               value={ptcRefNo}
-              onChange={e => setPtcRefNo(e.target.value)}
+              onChange={e => setPtcRefNo(e.target.value.toUpperCase())}
               required
             />
           </div>

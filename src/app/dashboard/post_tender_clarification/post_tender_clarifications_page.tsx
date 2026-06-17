@@ -266,7 +266,7 @@ export default function PostTenderClarificationsPage() {
         <h1 className="text-2xl font-bold">Post Tender Clarifications</h1>
         <button
           onClick={handleCreate}
-          className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700"
+          className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700 active:scale-95"
         >
           + Create
         </button>

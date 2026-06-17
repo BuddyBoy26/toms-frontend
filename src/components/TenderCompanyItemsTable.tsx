@@ -20,6 +20,8 @@ interface TenderCompanyItem {
   item_price: string
   item_quantity: string
   item_total_value: string
+  forex_rate: string
+  value_aed: string
   currency: CurrencyEnum
   discount_type: DiscountType
   discount_percent: string
@@ -27,6 +29,7 @@ interface TenderCompanyItem {
   discount_value: string
   discount_per_unit: string
   value_after_discount: string
+  value_aed_after_discount: string
   unit_after_discount?: string
 }
 
@@ -37,38 +40,58 @@ interface Props {
   onItemsChange?: (items: TenderCompanyItem[]) => void
 }
 
-// Utility functions for number formatting - FIXED to handle decimals properly during typing
-const formatNumber = (value: string | number): string => {
-  if (value === '' || value === null || value === undefined) return ''
+// Utility functions for number formatting
+const formatNumberForDisplay = (value: number | string | null | undefined): string => {
+  if (value === null || value === undefined || value === '') return '0'
   
-  const strValue = String(value)
+  const numValue = typeof value === 'string' ? parseFloat(value) : value
+  if (isNaN(numValue)) return '0'
   
-  // If the user just typed a decimal point, keep it
-  if (strValue.endsWith('.')) {
-    const numPart = strValue.slice(0, -1).replace(/[^\d]/g, '')
-    if (!numPart) return '0.'
-    const formatted = numPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
-    return formatted + '.'
+  // Convert to string with 2 decimal places
+  const fixedValue = numValue.toFixed(2)
+  const parts = fixedValue.split('.')
+  
+  // Add commas to integer part
+  const integerWithCommas = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  
+  // Return with decimal part
+  return `${integerWithCommas}.${parts[1]}`
+}
+
+const parseInputNumber = (value: string): string => {
+  if (!value) return ''
+  
+  // Remove all commas
+  let cleaned = value.replace(/,/g, '')
+  
+  // Allow only numbers and one decimal point
+  cleaned = cleaned.replace(/[^\d.]/g, '')
+  
+  // Ensure only one decimal point
+  const decimalCount = (cleaned.match(/\./g) || []).length
+  if (decimalCount > 1) {
+    const firstDecimalIndex = cleaned.indexOf('.')
+    cleaned = cleaned.slice(0, firstDecimalIndex + 1) + cleaned.slice(firstDecimalIndex + 1).replace(/\./g, '')
   }
   
-  // Remove everything except digits and decimal point
-  const numStr = strValue.replace(/[^\d.]/g, '')
-  if (!numStr) return ''
+  return cleaned
+}
+
+const formatInputForDisplay = (value: string): string => {
+  if (!value) return ''
   
-  // Split by decimal point
-  const parts = numStr.split('.')
+  const parts = value.split('.')
   const integerPart = parts[0]
-  const decimalPart = parts[1]
   
-  // Format integer part with commas
-  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  // Add commas to integer part
+  const formatted = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
   
-  // If there's a decimal part, include it (limit to 4 decimal places for precision)
-  if (decimalPart !== undefined) {
-    return `${formattedInteger}.${decimalPart.slice(0, 4)}`
+  // If there's a decimal part, add it back
+  if (parts.length > 1) {
+    return `${formatted}.${parts[1]}`
   }
   
-  return formattedInteger
+  return formatted
 }
 
 const parseFormattedNumber = (value: string): number => {
@@ -125,29 +148,36 @@ export default function TenderCompanyItemsTable({
         const formattedItems = data
           .map(item => {
             const quantity = item.item_quantity || 1
-            const discountType: DiscountType = item.discount_amount ? 'amount' : 'percent'
+            const totalValue = item.item_total_value || 0
+            const forexRate = item.forex_rate || 1
+            const valueAED = item.value_aed || 0
+            const discountValue = item.discount_value || 0
+            const valueAfterDiscount = totalValue - discountValue
+            const valueAEDAfterDiscount =  item.value_aed_after_discount || 0 // Assuming discount is in AED for simplicity
             
-            // Calculate discount per unit
-            const totalDiscountValue = item.discount_value || 0
-            const discountPerUnit = quantity > 0 ? totalDiscountValue / quantity : 0
+            // Calculate unit price after discount = value after discount / quantity
+            const unitPriceAfterDiscount = quantity > 0 ? valueAfterDiscount / quantity : 0
+            
+            const discountType: DiscountType = item.discount_amount ? 'amount' : 'percent'
             
             return {
               id: item.id,
               item_id: item.item_id,
               item_description: item.item?.item_description || '',
               item_no_dewa: item.item_no_dewa,
-              item_price: formatNumber(item.item_price),
-              item_quantity: formatNumber(item.item_quantity),
-              item_total_value: formatNumber(item.item_total_value),
+              item_price: formatInputForDisplay(String(item.item_price)),
+              item_quantity: formatInputForDisplay(String(item.item_quantity)),
+              item_total_value: formatNumberForDisplay(item.item_total_value),
+              forex_rate: formatInputForDisplay(String(item.forex_rate)),
+              value_aed: formatNumberForDisplay(item.value_aed),
               currency: item.currency,
               discount_type: discountType,
-              discount_percent: item.discount_percent ? formatNumber(item.discount_percent) : '',
-              discount_amount: item.discount_amount ? formatNumber(item.discount_amount) : '',
-              discount_value: item.discount_value ? formatNumber(item.discount_value) : '',
-              discount_per_unit: formatNumber(discountPerUnit),
-              value_after_discount: formatNumber(
-                parseFormattedNumber(String(item.item_total_value)) - (item.discount_value || 0)
-              ),
+              discount_percent: item.discount_percent ? String(item.discount_percent) : '',
+              discount_amount: item.discount_amount ? String(item.discount_amount) : '',
+              discount_value: formatNumberForDisplay(item.discount_value),
+              discount_per_unit: formatNumberForDisplay(unitPriceAfterDiscount),
+              value_after_discount: formatNumberForDisplay(valueAfterDiscount),
+              value_aed_after_discount: formatNumberForDisplay(valueAEDAfterDiscount),
             }
           })
           // Sort by DEWA item number
@@ -156,6 +186,8 @@ export default function TenderCompanyItemsTable({
             const numB = parseInt(b.item_no_dewa) || 0
             return numA - numB
           })
+
+          console.log('Fetched and formatted items:', formattedItems)
         
         setItems(formattedItems)
       })
@@ -176,38 +208,34 @@ export default function TenderCompanyItemsTable({
     const price = parseFormattedNumber(item.item_price)
     const totalValue = price * quantity
 
-    let discountPerUnit = 0
     let discountValue = 0
-    let discountPercent = parseFormattedNumber(item.discount_percent)
-    let discountAmount = parseFormattedNumber(item.discount_amount)
+    let discountPercent = parseFloat(item.discount_percent) || 0
+    let discountAmount = parseFloat(item.discount_amount) || 0
 
     if (item.discount_type === 'percent') {
-      // User enters percentage
-      // Calculate discount per unit = (price * percent) / 100
-      discountPerUnit = (price * discountPercent) / 100
-      // Calculate total discount = discountPerUnit * quantity
-      discountValue = discountPerUnit * quantity
-      // Calculate discount amount per unit (same as discountPerUnit in this case)
-      discountAmount = discountPerUnit
+      discountAmount = (price * discountPercent) / 100
+      discountValue = discountAmount * quantity
     } else {
-      // User enters amount per unit
-      // Discount per unit is the entered amount
-      discountPerUnit = discountAmount
-      // Calculate total discount = discountPerUnit * quantity
-      discountValue = discountPerUnit * quantity
-      // Calculate percentage = (discountPerUnit / price) * 100
-      discountPercent = price > 0 ? (discountPerUnit / price) * 100 : 0
+      discountValue = discountAmount * quantity
+      discountPercent = price > 0 ? (discountAmount / price) * 100 : 0
     }
 
     const valueAfterDiscount = totalValue - discountValue
+    const unitPriceAfterDiscount = quantity > 0 ? valueAfterDiscount / quantity : 0
+
+    const forexRate = parseFormattedNumber(item.forex_rate) || 1
+    const valueAED = totalValue * forexRate
+    const valueAEDAfterDiscount = valueAfterDiscount * forexRate
 
     return {
-      discountPerUnit: formatNumber(discountPerUnit.toFixed(2)),
-      discountValue: formatNumber(discountValue.toFixed(2)),
-      discountPercent: formatNumber(discountPercent.toFixed(2)),
-      discountAmount: formatNumber(discountAmount.toFixed(2)),
-      valueAfterDiscount: formatNumber(valueAfterDiscount.toFixed(2)),
-      itemTotalValue: formatNumber(totalValue.toFixed(2)),
+      discountPerUnit: formatNumberForDisplay(unitPriceAfterDiscount),
+      discountValue: formatNumberForDisplay(discountValue),
+      discountPercent: String(discountPercent),
+      discountAmount: String(discountAmount),
+      valueAfterDiscount: formatNumberForDisplay(valueAfterDiscount),
+      itemTotalValue: formatNumberForDisplay(totalValue),
+      valueAED: formatNumberForDisplay(valueAED),
+      valueAEDAfterDiscount: formatNumberForDisplay(valueAEDAfterDiscount),
     }
   }
 
@@ -224,9 +252,9 @@ export default function TenderCompanyItemsTable({
     const finalValue = totalItemValue - totalDiscounted
 
     return {
-      totalItemValue: formatNumber(totalItemValue.toFixed(2)),
-      totalDiscounted: formatNumber(totalDiscounted.toFixed(2)),
-      finalValue: formatNumber(finalValue.toFixed(2)),
+      totalItemValue: formatNumberForDisplay(totalItemValue),
+      totalDiscounted: formatNumberForDisplay(totalDiscounted),
+      finalValue: formatNumberForDisplay(finalValue),
     }
   }, [items])
 
@@ -237,13 +265,16 @@ export default function TenderCompanyItemsTable({
       item_price: '',
       item_quantity: '',
       item_total_value: '',
+      forex_rate: '',
+      value_aed: '',
       currency: tenderCurrency, // Use currency from tender
       discount_type: 'percent',
       discount_percent: '',
       discount_amount: '',
       discount_value: '',
-      discount_per_unit: '',
+      discount_per_unit: '0',
       value_after_discount: '0',
+      value_aed_after_discount: '0',
     }
     setItems([...items, newItem])
   }
@@ -285,6 +316,8 @@ export default function TenderCompanyItemsTable({
       discount_percent: calculated.discountPercent,
       discount_amount: calculated.discountAmount,
       value_after_discount: calculated.valueAfterDiscount,
+      value_aed: calculated.valueAED,
+      value_aed_after_discount: calculated.valueAEDAfterDiscount,
     }
 
     setItems(updatedItems)
@@ -304,6 +337,15 @@ export default function TenderCompanyItemsTable({
     }
   }
 
+  const handleInputChange = (index: number, field: keyof TenderCompanyItem, inputValue: string) => {
+    // Parse and format the input
+    const cleanedValue = parseInputNumber(inputValue)
+    const formattedValue = formatInputForDisplay(cleanedValue)
+    
+    // Update the item with formatted value
+    updateItem(index, field, formattedValue)
+  }
+
   const saveItems = async () => {
     if (saving) return
     
@@ -312,6 +354,7 @@ export default function TenderCompanyItemsTable({
     const token = localStorage.getItem('kkabbas_token')
 
     try {
+      console.log('Saving items with values:', items)
       for (const item of items) {
         if (!item.item_id || !item.item_no_dewa) {
           setError('Please fill all required fields')
@@ -319,22 +362,35 @@ export default function TenderCompanyItemsTable({
           return
         }
 
+        console.log('Saving item with values:', item)
+
         const payload = {
           tendering_companies_id: tenderingCompanyId,
           item_id: Number(item.item_id),
+          item_description: item.item_description,
           item_no_dewa: item.item_no_dewa,
-          item_price: parseFormattedNumber(item.item_price),
-          item_quantity: parseFormattedNumber(item.item_quantity),
-          item_total_value: parseFormattedNumber(item.item_total_value),
+          item_price: parseFormattedNumber(item.item_price).toFixed(4),
+          item_quantity: parseFormattedNumber(item.item_quantity).toFixed(4),
+          item_total_value: parseFormattedNumber(item.item_total_value).toFixed(4),
+          forex_rate: parseFormattedNumber(item.forex_rate).toFixed(4),
+          value_aed: parseFormattedNumber(item.value_aed).toFixed(4),
           currency: item.currency,
-          discount_percent: parseFormattedNumber(item.discount_percent),
-          discount_amount: parseFormattedNumber(item.discount_amount),
-          discount_value: parseFormattedNumber(item.discount_value),
+          discount_percent: parseFormattedNumber(item.discount_percent).toFixed(4) || 0,
+          discount_amount: parseFormattedNumber(item.discount_amount).toFixed(4) || 0,
+          discount_value: parseFormattedNumber(item.discount_value).toFixed(4),
+          value_aed_after_discount: parseFormattedNumber(item.value_aed_after_discount).toFixed(4),
         }
 
-        const url = `${API}/tender_company_items`
+        console.log('Payload to save:', payload)
+
+        const isUpdate = !!item.id
+
+        const url = isUpdate
+          ? `${API}/tender_company_items/${item.id}`
+          : `${API}/tender_company_items`
+
         const response = await fetch(url, {
-          method: 'POST',
+          method: isUpdate ? 'PUT' : 'POST',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
@@ -350,7 +406,6 @@ export default function TenderCompanyItemsTable({
 
       await fetchTenderCompanyItems()
       setError(null)
-      alert('Items saved successfully!')
     } catch (err: any) {
       setError(err.message || 'Failed to save items')
       console.error(err)
@@ -413,12 +468,15 @@ export default function TenderCompanyItemsTable({
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Curr</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Forex Rate</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Disc Type</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Disc %</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Disc/Unit</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Disc/Unit Calc</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unit After Disc</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Disc</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">After Disc</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value (AED)</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value (AED) After Disc</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
               </tr>
             </thead>
@@ -458,7 +516,7 @@ export default function TenderCompanyItemsTable({
                     <input
                       type="text"
                       value={item.item_price}
-                      onChange={(e) => updateItem(index, 'item_price', formatNumber(e.target.value))}
+                      onChange={(e) => handleInputChange(index, 'item_price', e.target.value)}
                       className="w-28 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"
                       placeholder="0.00"
                     />
@@ -469,7 +527,7 @@ export default function TenderCompanyItemsTable({
                     <input
                       type="text"
                       value={item.item_quantity}
-                      onChange={(e) => updateItem(index, 'item_quantity', formatNumber(e.target.value))}
+                      onChange={(e) => handleInputChange(index, 'item_quantity', e.target.value)}
                       className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"
                       placeholder="0"
                     />
@@ -495,6 +553,18 @@ export default function TenderCompanyItemsTable({
                     />
                   </td>
 
+                  {/* Forex Rate */}
+                  <td className="px-3 py-2">
+                    <input
+                      type="text"
+                      value={item.forex_rate}
+                      onChange={(e) => handleInputChange(index, 'forex_rate', e.target.value)}
+                      className="w-28 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"
+                      placeholder="0.00"
+                    />
+                  </td>
+
+
                   {/* Discount Type */}
                   <td className="px-3 py-2">
                     <select
@@ -510,9 +580,10 @@ export default function TenderCompanyItemsTable({
                   {/* Discount % (editable when type = percent) */}
                   <td className="px-3 py-2">
                     <input
-                      type="text"
+                      type="number"
+                      step="0.01"
                       value={item.discount_percent}
-                      onChange={(e) => updateItem(index, 'discount_percent', formatNumber(e.target.value))}
+                      onChange={(e) => updateItem(index, 'discount_percent', e.target.value)}
                       className={`w-20 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-green-500 ${
                         item.discount_type === 'amount' 
                           ? 'bg-yellow-50 border-yellow-300 text-gray-600' 
@@ -526,9 +597,10 @@ export default function TenderCompanyItemsTable({
                   {/* Discount Amount per Unit (editable when type = amount) */}
                   <td className="px-3 py-2">
                     <input
-                      type="text"
+                      type="number"
+                      step="0.01"
                       value={item.discount_amount}
-                      onChange={(e) => updateItem(index, 'discount_amount', formatNumber(e.target.value))}
+                      onChange={(e) => updateItem(index, 'discount_amount', e.target.value)}
                       className={`w-28 px-2 py-1 text-sm border rounded focus:ring-2 focus:ring-green-500 ${
                         item.discount_type === 'percent' 
                           ? 'bg-yellow-50 border-yellow-300 text-gray-600' 
@@ -539,14 +611,14 @@ export default function TenderCompanyItemsTable({
                     />
                   </td>
 
-                  {/* Discount Per Unit (always calculated - read-only) */}
+                  {/* Unit Price After Discount (always calculated - read-only) */}
                   <td className="px-3 py-2">
                     <input
                       type="text"
                       value={item.discount_per_unit}
                       readOnly
                       className="w-28 px-2 py-1 text-sm border border-gray-300 rounded bg-blue-50 font-medium"
-                      title="Calculated discount per unit"
+                      title="Price per unit after discount"
                     />
                   </td>
 
@@ -567,6 +639,28 @@ export default function TenderCompanyItemsTable({
                       value={item.value_after_discount}
                       readOnly
                       className="w-28 px-2 py-1 text-sm border border-gray-300 rounded bg-green-50 font-bold text-green-700"
+                    />
+                  </td>
+
+                  {/* Value (AED) */}
+                  <td className="px-3 py-2">
+                    <input
+                      type="text"
+                      value={item.value_aed}
+                      readOnly
+                      className="w-28 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"
+                      placeholder="0.00"
+                    />
+                  </td>
+
+                  {/* Value (AED) After Discount*/}
+                  <td className="px-3 py-2">
+                    <input
+                      type="text"
+                      value={item.value_aed_after_discount}
+                      readOnly
+                      className="w-28 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"
+                      placeholder="0.00"
                     />
                   </td>
 

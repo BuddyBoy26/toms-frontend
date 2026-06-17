@@ -284,7 +284,7 @@ export default function CompanyListPage() {
       .then(res => res.json())
       .then((data: Company[]) => {
         console.log('Fetched companies:', data)
-        setCompanies(data)
+        setCompanies(data.sort((a, b) => a.company_id - b.company_id))
       })
       .catch(err => {
         console.error('Failed to fetch companies:', err)
@@ -617,7 +617,7 @@ export default function CompanyListPage() {
     return companies.map(company => ({
       ...company,
       country: getCountryName(company.country) as any,
-    }))
+    })).sort((a, b) => a.company_id - b.company_id)
   }, [companies, countryMap])
 
   return (
@@ -753,7 +753,7 @@ export default function CompanyListPage() {
 
               <div className="flex justify-between items-center mt-6">
                 {/* Left side: Delete and Generate Report buttons */}
-                <div className="flex gap-2">
+                {/* <div className="flex gap-2">
                   {selectedCompany && (
                     <>
                       <button
@@ -779,8 +779,8 @@ export default function CompanyListPage() {
                         📄 Report
                       </button>
                     </>
-                  )}
-                </div>
+                  )}  
+                </div> */}
 
                 {/* Right side: Cancel and Save buttons */}
                 <div className="flex gap-3">

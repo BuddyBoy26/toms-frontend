@@ -19,6 +19,7 @@ interface TenderingCompany {
   tbg_value: number | null
   tbg_expiry_date: string | null
   tendering_currency: CurrencyEnum
+  tendering_currency_nq: CurrencyEnum
   pending_status: PendingStatusEnum
   debit_advice_no: string | null
   tender_bought: 0 | 1
@@ -159,7 +160,7 @@ export default function TenderingCompaniesListPage() {
         memo: yn(tc.memo),
         po_copies: yn(tc.po_copies),
       }
-    })
+    }).sort((a, b) => b.tendering_companies_id - a.tendering_companies_id) // Sort by ID desc
   }, [tcs, tenderMap, companyMap])
 
   const columns: Column<Row>[] = [
@@ -186,7 +187,7 @@ export default function TenderingCompaniesListPage() {
         <h1 className="text-2xl font-bold">Tendering Company Details</h1>
         <button
           onClick={() => router.push('/dashboard/tendering_company_details/create')}
-          className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700"
+          className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700 active:scale-95"
         >
           + Create
         </button>

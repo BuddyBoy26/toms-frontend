@@ -3,327 +3,429 @@
 
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState } from 'react'
-import toast from 'react-hot-toast'
 
-interface Order { order_id: number; po_number: string }
-
-type PBGStatus =
-  | 'NOT Issued'
-  | 'Issued / Extended'
-  | 'Extension Required'
-  | 'NOT Released'
-  | 'Released'
-
-interface PerformanceGuaranteeRec {
-  pg_id: number
+interface OrderDetail {
   order_id: number
-  pg_no: string
-  pg_issuing_bank: string | null
-  pg_deposit_receipt_no: string | null
-  cheque_no: string | null
-  tt_date: string | null
-  document_date: string | null
-  pg_value: number
-  pg_expiry_date: string
-  pg_submitted_date: string | null
-  pg_return_date: string | null
-  pg_release_date_dewa: string | null
-  pg_release_date_bank: string | null
-  pg_extension_dates: string[] | null
-  remarks: string | null
-  pending_status: PBGStatus
+  po_number: string
+  order_description: string
 }
 
-function coerceArray<T>(raw: unknown): T[] {
-  if (Array.isArray(raw)) return raw as T[]
-  if (raw && typeof raw === 'object') {
-    const obj = raw as Record<string, unknown>
-    if (Array.isArray(obj.items)) return obj.items as T[]
-    if (Array.isArray(obj.data)) return obj.data as T[]
-    if (Array.isArray(obj.results)) return obj.results as T[]
-    if (Array.isArray(obj.records)) return obj.records as T[]
-    if (Array.isArray(obj.rows)) return obj.rows as T[]
-    if (Array.isArray(obj.orders)) return obj.orders as T[]
-    if (Array.isArray(obj.order_details)) return obj.order_details as T[]
-    if (Array.isArray(obj.order_detail)) return obj.order_detail as T[]
+const formatDateString = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return ''
+  return dateStr.split('T')[0]
+}
+
+const formatNumber = (value: string | number): string => {
+  if (value === '' || value === null || value === undefined) return ''
+  const numStr = String(value).replace(/[^\d.]/g, '')
+  if (!numStr) return ''
+  const parts = numStr.split('.')
+  const integerPart = parts[0]
+  const decimalPart = parts[1]
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+  if (decimalPart !== undefined) {
+    return `${formattedInteger}.${decimalPart.slice(0, 4)}`
   }
-  return []
+  return formattedInteger
 }
-const toInputDate = (val: string | null) => (val ? val.slice(0,10) : '')
 
-export default function EditPerformanceGuaranteePage() {
-  const { id } = useParams() as { id: string } // pg_id
+const parseFormattedNumber = (value: string): number | null => {
+  if (!value) return null
+  const cleaned = value.replace(/,/g, '')
+  const num = parseFloat(cleaned)
+  return isNaN(num) ? null : num
+}
+
+export default function PGEditPage() {
   const router = useRouter()
+  const params = useParams()
+  const id = params.id as string
   const API = process.env.NEXT_PUBLIC_BACKEND_API_URL
 
-  const [orders, setOrders] = useState<Order[] | null>([])
-  const [rec, setRec] = useState<PerformanceGuaranteeRec | null>(null)
-
-  const [orderId, setOrderId] = useState<number | ''>('')
-
-  const [pgNo, setPgNo] = useState('')
-  const [pgIssuingBank, setPgIssuingBank] = useState('')
-  const [pgDepositReceiptNo, setPgDepositReceiptNo] = useState('')
-  const [chequeNo, setChequeNo] = useState('')
-  const [ttDate, setTtDate] = useState('')
-  const [documentDate, setDocumentDate] = useState('')
-  const [pgValue, setPgValue] = useState('')
-  const [pgExpiryDate, setPgExpiryDate] = useState('')
-  const [pgSubmittedDate, setPgSubmittedDate] = useState('')
-  const [pgReturnDate, setPgReturnDate] = useState('')
-  const [pgReleaseDateDewa, setPgReleaseDateDewa] = useState('')
-  const [pgReleaseDateBank, setPgReleaseDateBank] = useState('')
-
-  const [extensionDateInput, setExtensionDateInput] = useState('')
-  const [pgExtensionDates, setPgExtensionDates] = useState<string[]>([])
-
-  const [remarks, setRemarks] = useState('')
-  const [pendingStatus, setPendingStatus] = useState<PBGStatus>('NOT Issued')
-
+  const [orders, setOrders] = useState<OrderDetail[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  const [formData, setFormData] = useState({
+    order_id: '' as number | '',
+    pg_no: '',
+    pg_bank_or_deposit: 0,
+    pg_issuing_bank: '',
+    pg_deposit_receipt_no: '',
+    pg_value: '',
+    pg_expiry_date: '',
+    pg_submitted_date: '',
+    pg_release_date_dewa: '',
+    pg_release_date_bank: '',
+    pg_extension_dates: [] as string[],
+    remarks: '',
+    pending_status: 'NOT Issued',
+  })
+
+  const [newExtensionDate, setNewExtensionDate] = useState('')
+
   useEffect(() => {
-    const token = localStorage.getItem('kkabbas_token') || ''
+    const token = localStorage.getItem('kkabbas_token')
+    
     Promise.all([
-      fetch(`${API}/order_detail`, { headers:{ Authorization:`Bearer ${token}` } }).then(r=>r.json()).catch(()=>null),
-      fetch(`${API}/performance_guarantee/${id}`, { headers:{ Authorization:`Bearer ${token}` } }).then(r=>r.json()).catch(()=>null),
-    ]).then(([ordersRaw, data]) => {
-      const arr = coerceArray<Order>(ordersRaw)
-      if (!Array.isArray(arr)) console.warn('Unexpected /order_detail shape:', ordersRaw)
-      setOrders(arr)
+      fetch(`${API}/performance_guarantee/${id}`, { headers: { Authorization: `Bearer ${token}` } }),
+      fetch(`${API}/order_detail`, { headers: { Authorization: `Bearer ${token}` } })
+    ])
+      .then(async ([pgRes, ordersRes]) => {
+        if (!pgRes.ok) throw new Error('Failed to fetch PG data')
+        const data = await pgRes.json()
+        const ordersData = await ordersRes.json()
+        
+        setOrders(Array.isArray(ordersData) ? ordersData : [])
 
-      if (!data || typeof data !== 'object') {
-        setError('Failed to load')
-        return
-      }
-      const r = data as PerformanceGuaranteeRec
-      setRec(r)
-
-      setOrderId(r.order_id)
-      setPgNo(r.pg_no)
-      setPgIssuingBank(r.pg_issuing_bank ?? '')
-      setPgDepositReceiptNo(r.pg_deposit_receipt_no ?? '')
-      setChequeNo(r.cheque_no ?? '')
-      setTtDate(toInputDate(r.tt_date))
-      setDocumentDate(toInputDate(r.document_date))
-      setPgValue(String(r.pg_value))
-      setPgExpiryDate(toInputDate(r.pg_expiry_date))
-      setPgSubmittedDate(toInputDate(r.pg_submitted_date))
-      setPgReturnDate(toInputDate(r.pg_return_date))
-      setPgReleaseDateDewa(toInputDate(r.pg_release_date_dewa))
-      setPgReleaseDateBank(toInputDate(r.pg_release_date_bank))
-      setPgExtensionDates(Array.isArray(r.pg_extension_dates) ? r.pg_extension_dates : [])
-      setRemarks(r.remarks ?? '')
-      setPendingStatus(r.pending_status ?? 'NOT Issued')
-    }).catch(()=>{
-      setError('Failed to load')
-      setOrders([]) // ensure array fallback
-    }).finally(()=>setLoading(false))
+        setFormData({
+          order_id: data.order_id,
+          pg_no: data.pg_no || '',
+          pg_bank_or_deposit: data.pg_bank_or_deposit || 0,
+          pg_issuing_bank: data.pg_issuing_bank || '',
+          pg_deposit_receipt_no: data.pg_deposit_receipt_no || '',
+          pg_value: data.pg_value ? formatNumber(String(data.pg_value)) : '',
+          pg_expiry_date: formatDateString(data.pg_expiry_date),
+          pg_submitted_date: formatDateString(data.pg_submitted_date),
+          pg_release_date_dewa: formatDateString(data.pg_release_date_dewa),
+          pg_release_date_bank: formatDateString(data.pg_release_date_bank),
+          pg_extension_dates: data.pg_extension_dates || [],
+          remarks: data.remarks || '',
+          pending_status: data.pending_status || 'NOT Issued',
+        })
+      })
+      .catch((e) => setError(e.message))
+      .finally(() => setLoading(false))
   }, [API, id])
 
-  const addExtensionDate = () => {
-    if (!extensionDateInput) return
-    if (pgExtensionDates.includes(extensionDateInput)) return
-    setPgExtensionDates(prev => [...prev, extensionDateInput].sort())
-    setExtensionDateInput('')
+  const handleAmountChange = (value: string) => {
+    setFormData({ ...formData, pg_value: formatNumber(value) })
   }
-  const removeExtensionDate = (d: string) => {
-    setPgExtensionDates(prev => prev.filter(x=>x!==d))
-  }
-  const toNum = (s: string) => {
-    const n = parseFloat(s); return isNaN(n) ? null : n
-  }
-  const toNull = (s: string) => (s && s.trim() !== '' ? s.trim() : null)
 
-  const handleSave = async (e: React.FormEvent) => {
+  const addExtensionDate = () => {
+    if (newExtensionDate) {
+      setFormData({
+        ...formData,
+        pg_extension_dates: [...formData.pg_extension_dates, newExtensionDate]
+      })
+      setNewExtensionDate('')
+    }
+  }
+
+  const removeExtensionDate = (index: number) => {
+    setFormData({
+      ...formData,
+      pg_extension_dates: formData.pg_extension_dates.filter((_, i) => i !== index)
+    })
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
 
-    if (!orderId) { toast.error('Select an Order'); return }
-    if (!pgNo.trim()) { toast.error('PG No is required'); return }
-    if (!pgValue || toNum(pgValue) === null) { toast.error('PG Value is required'); return }
-    if (!pgExpiryDate) { toast.error('PG Expiry Date is required'); return }
+    if (!formData.order_id) {
+      setError('Please select a Purchase Order.')
+      return
+    }
 
     setSaving(true)
     const payload = {
-      order_id: Number(orderId),
-      pg_no: pgNo.trim(),
-      pg_issuing_bank: toNull(pgIssuingBank),
-      pg_deposit_receipt_no: toNull(pgDepositReceiptNo),
-      cheque_no: toNull(chequeNo),
-      tt_date: ttDate || null,
-      document_date: documentDate || null,
-      pg_value: toNum(pgValue),
-      pg_expiry_date: pgExpiryDate || null,
-      pg_submitted_date: pgSubmittedDate || null,
-      pg_return_date: pgReturnDate || null,
-      pg_release_date_dewa: pgReleaseDateDewa || null,
-      pg_release_date_bank: pgReleaseDateBank || null,
-      pg_extension_dates: pgExtensionDates.length ? pgExtensionDates : null,
-      remarks: toNull(remarks),
-      pending_status: pendingStatus,
+      order_id: Number(formData.order_id),
+      pg_no: formData.pg_no,
+      pg_bank_or_deposit: formData.pg_bank_or_deposit,
+      pg_issuing_bank: formData.pg_bank_or_deposit === 0 ? formData.pg_issuing_bank : null,
+      pg_deposit_receipt_no: formData.pg_bank_or_deposit === 1 ? formData.pg_deposit_receipt_no : null,
+      pg_value: parseFormattedNumber(formData.pg_value) || 0,
+      pg_expiry_date: formData.pg_expiry_date,
+      pg_submitted_date: formData.pg_submitted_date || null,
+      pg_release_date_dewa: formData.pg_release_date_dewa || null,
+      pg_release_date_bank: formData.pg_release_date_bank || null,
+      pg_extension_dates: formData.pg_extension_dates.length > 0 ? formData.pg_extension_dates : null,
+      remarks: formData.remarks || null,
+      pending_status: formData.pending_status,
     }
 
-    const res = await fetch(`${API}/performance_guarantee/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type':'application/json',
-        Authorization:`Bearer ${localStorage.getItem('kkabbas_token') || ''}`
-      },
-      body: JSON.stringify(payload)
-    })
+    try {
+      const response = await fetch(`${API}/performance_guarantee/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('kkabbas_token')}`,
+        },
+        body: JSON.stringify(payload),
+      })
 
-    setSaving(false)
-    if (!res.ok) {
-      const err = await res.json().catch(()=>null)
-      const msg = err?.detail || 'Failed to save'
-      setError(msg)
-      toast.error(msg)
-    } else {
-      toast.success('Performance Guarantee saved')
-      router.refresh()
+      if (response.ok) {
+        router.push('/dashboard/performance_guarantee')
+      } else {
+        const err = await response.json().catch(() => null)
+        setError(err?.detail || 'Failed to update PG')
+      }
+    } catch (error) {
+      console.error(error)
+      setError('An error occurred while saving.')
+    } finally {
+      setSaving(false)
     }
   }
 
-  const handleDelete = async () => {
-    if (!confirm('Delete this Performance Guarantee?')) return
-    await fetch(`${API}/performance_guarantee/${id}`, {
-      method: 'DELETE',
-      headers: { Authorization:`Bearer ${localStorage.getItem('kkabbas_token') || ''}` }
-    })
-    toast.success('Record deleted')
-    router.push('/dashboard/performance_guarantee')
-  }
-
-  if (loading) return <p>Loading…</p>
-  if (!rec) return <p className="text-red-600">Record not found.</p>
-
-  const fieldCls = 'mt-1 w-full px-2 py-1 h-8 border rounded-md text-sm'
-  const labelCls = 'block text-xs font-medium'
-  const section3 = 'grid grid-cols-3 gap-3'
-  const orderOptions: Order[] = Array.isArray(orders) ? orders : [] // <— render-time guard
+  if (loading) return <div className="p-4 text-center">Loading...</div>
 
   return (
-    <div className="max-w-6xl p-6">
-      <h1 className="text-xl font-semibold mb-4">Edit Performance Guarantee #{rec.pg_id}</h1>
-      <form onSubmit={handleSave} className="space-y-5">
-        {error && <p className="text-red-600 text-sm">{error}</p>}
+    <div className="max-w-6xl mx-auto p-4 space-y-4">
+      <div className="mb-4">
+        <h1 className="text-2xl font-bold">Edit Performance Guarantee</h1>
+      </div>
 
-        <div className={section3}>
-          <div>
-            <label className={labelCls}>Order</label>
-            <select className={fieldCls} value={orderId} onChange={e=>setOrderId(e.target.value ? Number(e.target.value) : '')} required>
-              <option value="">Select order</option>
-              {orderOptions.map(o => (
-                <option key={o.order_id} value={o.order_id}>{o.po_number}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>PG No</label>
-            <input type="text" className={fieldCls} value={pgNo} onChange={e=>setPgNo(e.target.value)} required />
-          </div>
-          <div>
-            <label className={labelCls}>Issuing Bank</label>
-            <input type="text" className={fieldCls} value={pgIssuingBank} onChange={e=>setPgIssuingBank(e.target.value)} />
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">
+          {error}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        
+        {/* Basic Information */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h2 className="text-lg font-semibold mb-3">Basic Information</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Order (PO) *</label>
+              <select
+                value={formData.order_id}
+                onChange={(e) => setFormData({ ...formData, order_id: e.target.value === '' ? '' : Number(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+              >
+                <option value="">-- Select PO --</option>
+                {orders.map(o => (
+                  <option key={o.order_id} value={o.order_id}>{o.po_number} - {o.order_description}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">PG Number *</label>
+              <input
+                type="text"
+                value={formData.pg_no}
+                onChange={(e) => setFormData({ ...formData, pg_no: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+              />
+            </div>
           </div>
         </div>
 
-        <div className={section3}>
-          <div>
-            <label className={labelCls}>Deposit Receipt No</label>
-            <input type="text" className={fieldCls} value={pgDepositReceiptNo} onChange={e=>setPgDepositReceiptNo(e.target.value)} />
+        {/* Guarantee Type Details */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold">Guarantee Details</h2>
+            <div className="flex items-center gap-4">
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  checked={formData.pg_bank_or_deposit === 0}
+                  onChange={() => setFormData({ ...formData, pg_bank_or_deposit: 0 })}
+                  className="w-4 h-4 text-green-600 focus:ring-green-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Bank Guarantee</span>
+              </label>
+              <label className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  checked={formData.pg_bank_or_deposit === 1}
+                  onChange={() => setFormData({ ...formData, pg_bank_or_deposit: 1 })}
+                  className="w-4 h-4 text-green-600 focus:ring-green-500"
+                />
+                <span className="text-sm font-medium text-gray-700">Deposit</span>
+              </label>
+            </div>
           </div>
-          <div>
-            <label className={labelCls}>Cheque No</label>
-            <input type="text" className={fieldCls} value={chequeNo} onChange={e=>setChequeNo(e.target.value)} />
-          </div>
-          <div>
-            <label className={labelCls}>TT Date</label>
-            <input type="date" className={fieldCls} value={ttDate} onChange={e=>setTtDate(e.target.value)} />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {formData.pg_bank_or_deposit === 0 ? (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Issuing Bank</label>
+                <input
+                  type="text"
+                  value={formData.pg_issuing_bank}
+                  onChange={(e) => setFormData({ ...formData, pg_issuing_bank: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            ) : (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Deposit Receipt No</label>
+                <input
+                  type="text"
+                  value={formData.pg_deposit_receipt_no}
+                  onChange={(e) => setFormData({ ...formData, pg_deposit_receipt_no: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            )}
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">PG Value *</label>
+              <input
+                type="text"
+                value={formData.pg_value}
+                onChange={(e) => handleAmountChange(e.target.value)}
+                placeholder="0.00"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+              />
+            </div>
           </div>
         </div>
 
-        <div className={section3}>
-          <div>
-            <label className={labelCls}>Document Date</label>
-            <input type="date" className={fieldCls} value={documentDate} onChange={e=>setDocumentDate(e.target.value)} />
+        {/* Dates & Status */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h2 className="text-lg font-semibold mb-3">Dates & Status Tracking</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Expiry Date *</label>
+              <input
+                type="date"
+                value={formData.pg_expiry_date}
+                onChange={(e) => setFormData({ ...formData, pg_expiry_date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Submitted Date</label>
+              <input
+                type="date"
+                value={formData.pg_submitted_date}
+                onChange={(e) => setFormData({ ...formData, pg_submitted_date: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">DEWA Release Date</label>
+              <input
+                type="date"
+                value={formData.pg_release_date_dewa}
+                onChange={(e) => setFormData({ ...formData, pg_release_date_dewa: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Bank Release Date</label>
+              <input
+                type="date"
+                value={formData.pg_release_date_bank}
+                onChange={(e) => setFormData({ ...formData, pg_release_date_bank: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
           </div>
-          <div>
-            <label className={labelCls}>PG Value</label>
-            <input type="number" step="0.01" className={fieldCls} value={pgValue} onChange={e=>setPgValue(e.target.value)} required />
-          </div>
-          <div>
-            <label className={labelCls}>PG Expiry Date</label>
-            <input type="date" className={fieldCls} value={pgExpiryDate} onChange={e=>setPgExpiryDate(e.target.value)} required />
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Pending Status *</label>
+              <select
+                value={formData.pending_status}
+                onChange={(e) => setFormData({ ...formData, pending_status: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                required
+              >
+                <option value="NOT Issued">NOT Issued</option>
+                <option value="Issued / Extended">Issued / Extended</option>
+                <option value="Extension Required">Extension Required</option>
+                <option value="NOT Released">NOT Released</option>
+                <option value="Released">Released</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Remarks</label>
+              <textarea
+                value={formData.remarks}
+                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+                rows={1}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
           </div>
         </div>
 
-        <div className={section3}>
-          <div>
-            <label className={labelCls}>PG Submitted Date</label>
-            <input type="date" className={fieldCls} value={pgSubmittedDate} onChange={e=>setPgSubmittedDate(e.target.value)} />
+        {/* Extension Dates */}
+        <div className="bg-white rounded-lg border border-gray-200 p-4">
+          <h2 className="text-lg font-semibold mb-3">Extension Dates</h2>
+          
+          <div className="flex gap-2 mb-3">
+            <input
+              type="date"
+              value={newExtensionDate}
+              onChange={(e) => setNewExtensionDate(e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+            />
+            <button
+              type="button"
+              onClick={addExtensionDate}
+              disabled={!newExtensionDate}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition text-sm"
+            >
+              + Add
+            </button>
           </div>
-          <div>
-            <label className={labelCls}>PG Return Date</label>
-            <input type="date" className={fieldCls} value={pgReturnDate} onChange={e=>setPgReturnDate(e.target.value)} />
-          </div>
-          <div>
-            <label className={labelCls}>PG Release Date (DEWA)</label>
-            <input type="date" className={fieldCls} value={pgReleaseDateDewa} onChange={e=>setPgReleaseDateDewa(e.target.value)} />
-          </div>
-        </div>
 
-        <div className={section3}>
-          <div>
-            <label className={labelCls}>PG Release Date (Bank)</label>
-            <input type="date" className={fieldCls} value={pgReleaseDateBank} onChange={e=>setPgReleaseDateBank(e.target.value)} />
-          </div>
-        </div>
-
-        <div className="border rounded-md p-3">
-          <span className="text-xs font-medium text-gray-700">PG Extension Dates</span>
-          <div className="mt-2 flex gap-2">
-            <input type="date" className={fieldCls + ' max-w-xs'} value={extensionDateInput} onChange={e=>setExtensionDateInput(e.target.value)} />
-            <button type="button" onClick={addExtensionDate} className="px-3 h-8 bg-gray-800 text-white rounded-md text-sm">Add</button>
-          </div>
-          {pgExtensionDates.length>0 && (
-            <div className="mt-2 flex flex-wrap gap-2">
-              {pgExtensionDates.map(d=>(
-                <span key={d} className="inline-flex items-center gap-2 px-2 h-7 rounded-full bg-gray-100 text-xs">
-                  {d}
-                  <button type="button" onClick={()=>removeExtensionDate(d)} className="text-gray-600 hover:text-red-600">×</button>
-                </span>
-              ))}
+          {formData.pg_extension_dates.length > 0 && (
+            <div className="border border-gray-200 rounded-md overflow-hidden">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">#</th>
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">Extension Date</th>
+                    <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {formData.pg_extension_dates.map((date, index) => (
+                    <tr key={index} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 text-sm text-gray-900">{index + 1}</td>
+                      <td className="px-3 py-2 text-sm text-gray-900">{new Date(date).toLocaleDateString('en-GB')}</td>
+                      <td className="px-3 py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => removeExtensionDate(index)}
+                          className="text-red-600 hover:text-red-800 transition"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
 
-        <div className={section3}>
-          <div>
-            <label className={labelCls}>Pending Status</label>
-            <select className={fieldCls} value={pendingStatus} onChange={e=>setPendingStatus(e.target.value as PBGStatus)} required>
-              <option value="NOT Issued">NOT Issued</option>
-              <option value="Issued / Extended">Issued / Extended</option>
-              <option value="Extension Required">Extension Required</option>
-              <option value="NOT Released">NOT Released</option>
-              <option value="Released">Released</option>
-            </select>
-          </div>
-          <div className="col-span-2">
-            <label className={labelCls}>Remarks</label>
-            <textarea className="mt-1 w-full px-2 py-2 border rounded-md text-sm" rows={3} value={remarks} onChange={e=>setRemarks(e.target.value)} />
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          <button type="submit" disabled={saving} className="flex-1 py-2 h-10 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm">
-            {saving ? 'Saving…' : 'Save'}
+        {/* Actions */}
+        <div className="flex justify-end gap-3 pt-4">
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/performance_guarantee')}
+            className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition"
+          >
+            Cancel
           </button>
-          <button type="button" onClick={handleDelete} className="flex-1 py-2 h-10 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm">
-            Delete
+          <button
+            type="submit"
+            disabled={saving}
+            className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-2"
+          >
+            {saving && (
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+            )}
+            {saving ? 'Updating...' : 'Update Guarantee'}
           </button>
         </div>
       </form>

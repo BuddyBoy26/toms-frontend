@@ -384,7 +384,7 @@ export default function ProductListPage() {
 
               <div className="flex justify-between items-center mt-6">
                 {/* Left side: Delete and Generate Report buttons */}
-                <div className="flex gap-2">
+                {/* <div className="flex gap-2">
                   {selectedProduct && (
                     <>
                       <button
@@ -411,7 +411,7 @@ export default function ProductListPage() {
                       </button>
                     </>
                   )}
-                </div>
+                </div> */}
 
                 {/* Right side: Cancel and Save buttons */}
                 <div className="flex gap-3">

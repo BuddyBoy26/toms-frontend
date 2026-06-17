@@ -286,7 +286,7 @@ export default function OrderDetailsListPage() {
           </button>
           <button
             onClick={() => router.push('/dashboard/order_detail/create')}
-            className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700"
+            className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700 active:scale-95"
           >
             + Create
           </button>

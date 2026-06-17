@@ -176,7 +176,7 @@ export default function PostTenderClarificationsPage() {
       tender_id: tenderingCompany?.tender_id || '',
       company_id: tenderingCompany?.company_id || '',
       ptc_no: ptc.ptc_no.toString(),
-      ptc_ref_no: ptc.ptc_ref_no,
+      ptc_ref_no: ptc.ptc_ref_no.toUpperCase(),
       ptc_date: ptc.ptc_date,
       ptc_received_date: ptc.ptc_received_date,
       ptc_reply_required_by: ptc.ptc_reply_required_by,
@@ -242,7 +242,7 @@ export default function PostTenderClarificationsPage() {
     const payload = {
       tc_id: tenderingCompany.tendering_companies_id,
       ptc_no: Number(formData.ptc_no),
-      ptc_ref_no: formData.ptc_ref_no,
+      ptc_ref_no: formData.ptc_ref_no.toUpperCase(),
       ptc_date: formData.ptc_date,
       ptc_received_date: formData.ptc_received_date,
       ptc_reply_required_by: formData.ptc_reply_required_by,
@@ -523,7 +523,7 @@ export default function PostTenderClarificationsPage() {
     ptc_date: formatDate(row.ptc_date),
     ptc_received_date: formatDate(row.ptc_received_date),
     ptc_reply_required_by: formatDate(row.ptc_reply_required_by),
-    ptc_reply_submission_date: formatDate(row.ptc_reply_submission_date),
+    ptc_reply_submission_date: row.ptc_reply_submission_date ? formatDate(row.ptc_reply_submission_date) : 'NO',
   }))
 
   return (
@@ -543,7 +543,7 @@ export default function PostTenderClarificationsPage() {
           </button>
           <button
             onClick={handleCreate}
-            className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700"
+            className="rounded-md bg-green-600 px-4 py-2 text-white transition hover:bg-green-700 active:scale-95"
           >
             + Create
           </button>
@@ -678,9 +678,10 @@ export default function PostTenderClarificationsPage() {
                       type="text"
                       value={formData.ptc_ref_no}
                       onChange={(e) =>
-                        setFormData({ ...formData, ptc_ref_no: e.target.value })
+                        setFormData({ ...formData, ptc_ref_no: e.target.value})
                       }
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
+                      style={{ textTransform: 'uppercase' }}
                       required
                     />
                   </div>
@@ -747,7 +748,7 @@ export default function PostTenderClarificationsPage() {
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                     />
                   </div>
-                </div>
+                </div>it
               </div>
 
               <div className="flex justify-between items-center mt-6">

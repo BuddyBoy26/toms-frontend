@@ -13,7 +13,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Khalid and Khalid Abbas Portal",
+  title: {
+    template: "%s | KKA Portal", // %s will be replaced by the child page's title
+    default: "Khalid and Khalid Abbas Portal", // Fallback if a child page has no title
+  },
   description: "KKA's Tender and Order Management System",
 };
 
@@ -24,9 +27,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         {children}
       </body>
     </html>

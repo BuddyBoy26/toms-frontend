@@ -96,11 +96,20 @@ const sanitizeNumberInput = (value: string): string => {
   return formattedInteger
 }
 
-const parseFormattedNumber = (value: string): number => {
-  if (!value) return 0
-  const cleaned = value.replace(/,/g, '')
-  const num = parseFloat(cleaned)
-  return isNaN(num) ? 0 : num
+const parseFormattedNumber = (value: any): number => {
+  if (value === null || value === undefined || value === '') return 0
+
+  // If already number
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0
+  }
+
+  // Convert everything else to string safely
+  const cleaned = String(value).replace(/,/g, '').trim()
+
+  const num = Number(cleaned)
+
+  return Number.isFinite(num) ? num : 0
 }
 
 // Round to 4 decimal places
@@ -217,8 +226,8 @@ export default function OrderItemsTable({
       .then((data: any[]) => {
         const formattedItems = data
           .map(item => {
-            const quantity = parseFormattedNumber(String(item.item_quantity))
-            const unitPrice = parseFormattedNumber(String(item.item_unit_price))
+            const quantity = Number(item.item_quantity)
+            const unitPrice = Number(item.item_unit_price)
             const totalValue = roundTo4Decimals(quantity * unitPrice)
             
             // Determine discount type
@@ -227,7 +236,7 @@ export default function OrderItemsTable({
             // Calculate discount per unit
             const totalDiscountValue = item.discount_value || 0
             const discountPerUnit = quantity > 0 ? roundTo4Decimals(totalDiscountValue / quantity) : 0
-            
+            console.log(item.discount_value)
             return {
               order_item_detail_id: item.order_item_detail_id,
               item_id: item.item_id,
@@ -242,7 +251,7 @@ export default function OrderItemsTable({
               discount_type: discountType,
               discount_percent: item.discount_percent ? String(item.discount_percent) : '',
               discount_amount: item.discount_amount ? String(item.discount_amount) : '',
-              discount_value: item.discount_value ? formatNumberForDisplay(item.discount_value) : '',
+              discount_value: item.discount_value ? Number(item.discount_value) : '',
               discount_per_unit: formatNumberForDisplay(discountPerUnit),
               value_after_discount: formatNumberForDisplay(roundTo4Decimals(totalValue - (item.discount_value || 0))),
             }
@@ -525,7 +534,6 @@ export default function OrderItemsTable({
 
       await fetchOrderItems()
       setError(null)
-      alert('Items saved successfully!')
     } catch (err: any) {
       setError(err.message || 'Failed to save items')
       console.error(err)
@@ -600,7 +608,7 @@ export default function OrderItemsTable({
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Disc Type</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Disc %</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Disc/Unit</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Disc/Unit Calc</th>
+                {/* <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Disc/Unit Calc</th> */}
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Disc</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">After Disc</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Lots</th>
@@ -728,14 +736,14 @@ export default function OrderItemsTable({
                   </td>
 
                   {/* Discount Per Unit (Calculated - Read-only) */}
-                  <td className="px-3 py-2">
+                  {/* <td className="px-3 py-2">
                     <input
                       type="text"
                       value={item.discount_per_unit}
                       readOnly
                       className="w-24 px-2 py-1 text-sm border border-gray-300 rounded bg-blue-50 text-blue-700 font-medium"
                     />
-                  </td>
+                  </td> */}
 
                   {/* Total Discount Value (Read-only) */}
                   <td className="px-3 py-2">

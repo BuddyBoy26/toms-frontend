@@ -262,7 +262,7 @@ export default function ItemListPage() {
     components.push({
       type: "table",
       props: {
-        headers: ["ID", "Product", "Short Description", "HS Code"],
+        headers: ["ID", "Short Description", "Product", "HS Code"],
         rows: tableRows,
       },
     })
@@ -365,8 +365,8 @@ export default function ItemListPage() {
 
   const columns: Column<ItemWithProduct>[] = [
     { key: 'item_id', header: 'ID' },
-    { key: 'product_name', header: 'Product Name' },
     { key: 'item_short_description', header: 'Short Description' },
+    { key: 'product_name', header: 'Product Name' },
     { key: 'hs_code', header: 'HS Code' },
   ]
 
@@ -377,7 +377,7 @@ export default function ItemListPage() {
       (item.item_description.length > 50 
         ? item.item_description.substring(0, 50) + '...' 
         : item.item_description) as any
-  }))
+  })).sort((a, b) => a.item_id - b.item_id)
 
   return (
     <div>
@@ -524,7 +524,7 @@ export default function ItemListPage() {
 
               <div className="flex justify-between items-center mt-6">
                 {/* Left side: Delete and Generate Report buttons */}
-                <div className="flex gap-2">
+                {/* <div className="flex gap-2">
                   {selectedItem && (
                     <>
                       <button
@@ -551,7 +551,7 @@ export default function ItemListPage() {
                       </button>
                     </>
                   )}
-                </div>
+                </div> */}
 
                 {/* Right side: Cancel and Save buttons */}
                 <div className="flex gap-3">
