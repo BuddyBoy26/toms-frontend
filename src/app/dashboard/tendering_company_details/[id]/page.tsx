@@ -193,7 +193,7 @@ export default function TenderingCompanyEditPage() {
   // Get tender currency from selected tender
   const tenderCurrency = useMemo(() => {
     const selectedTender = tenders.find(t => t.tender_id === formData.tender_id)
-    return selectedTender?.currency_nq || 'AED'
+    return selectedTender?.currency || 'AED'
   }, [formData.tender_id, tenders])
 
   // Get company and tender names for display

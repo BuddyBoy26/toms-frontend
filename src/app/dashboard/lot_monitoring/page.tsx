@@ -401,111 +401,101 @@ export default function LotMonitoringPage() {
     console.log('Updated Lot:', updatedLots[lotIndex])
 
     // Inspection call date calculation
-    if (field === 'contractual_delivery_date') {
-      const d = new Date(updatedLots[lotIndex].contractual_delivery_date);
-      d.setDate(d.getDate() - 60);
-      updatedLots[lotIndex].inspection_call_date_tent = d.toISOString().split('T')[0]; // keeps it in "YYYY-MM-DD"
-    }
+if (field === 'contractual_delivery_date') {
+  const cdd = updatedLots[lotIndex].contractual_delivery_date;
+  if (cdd) {
+    const d = new Date(cdd);
+    d.setDate(d.getDate() - 60);
+    updatedLots[lotIndex].inspection_call_date_tent = d.toISOString().split('T')[0];
+  }
+}
 
-    if (field === "dispatch_clearance_date" || field === "actual_inspection_date" || field === "no_of_inspection_days") {
-      const dispatchDate = new Date(updatedLots[lotIndex].dispatch_clearance_date);
-      const inspectionDate = new Date(updatedLots[lotIndex].actual_inspection_date);
-      const inspectionDays = Number(updatedLots[lotIndex].no_of_inspection_days) || 0;
+if (field === "dispatch_clearance_date" || field === "actual_inspection_date" || field === "no_of_inspection_days") {
+  const dispatchDate = new Date(updatedLots[lotIndex].dispatch_clearance_date ?? '');
+  const inspectionDate = new Date(updatedLots[lotIndex].actual_inspection_date ?? '');
+  const inspectionDays = Number(updatedLots[lotIndex].no_of_inspection_days) || 0;
 
-      if (!isNaN(dispatchDate.getTime()) && !isNaN(inspectionDate.getTime())) {
-        const diffMs = dispatchDate - inspectionDate;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  if (!isNaN(dispatchDate.getTime()) && !isNaN(inspectionDate.getTime())) {
+    const diffMs = dispatchDate.getTime() - inspectionDate.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    const x = diffDays - inspectionDays + 1;
+    updatedLots[lotIndex].dispatch_clearance_delay = x > 0 ? x : 0;
+  }
+}
 
-        const x = diffDays - inspectionDays + 1;
+if (field === "actual_inspection_date" || field === "inspection_date_advised") {
+  const advisedDate = new Date(updatedLots[lotIndex].inspection_date_advised ?? '');
+  const inspectionDate = new Date(updatedLots[lotIndex].actual_inspection_date ?? '');
 
-        updatedLots[lotIndex].dispatch_clearance_delay = x > 0 ? x : 0;
-          
-      }
-    }
+  if (!isNaN(advisedDate.getTime()) && !isNaN(inspectionDate.getTime())) {
+    const diffMs = inspectionDate.getTime() - advisedDate.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    updatedLots[lotIndex].inspection_delay_days = diffDays > 0 ? diffDays : 0;
+  }
+}
 
-    if (field === "actual_inspection_date" || field === "inspection_date_advised") {
-      const advisedDate = new Date(updatedLots[lotIndex].inspection_date_advised);
-      const inspectionDate = new Date(updatedLots[lotIndex].actual_inspection_date);
+if (field === "actual_delivery_date" || field === "contractual_delivery_date") {
+  const actualDeliveryDate = new Date(updatedLots[lotIndex].actual_delivery_date ?? '');
+  const contractualDeliveryDate = new Date(updatedLots[lotIndex].contractual_delivery_date ?? '');
 
-      if (!isNaN(advisedDate.getTime()) && !isNaN(inspectionDate.getTime())) {
-        const diffMs = inspectionDate - advisedDate;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+  if (!isNaN(actualDeliveryDate.getTime()) && !isNaN(contractualDeliveryDate.getTime())) {
+    const diffMs = actualDeliveryDate.getTime() - contractualDeliveryDate.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    updatedLots[lotIndex].main_units_delay_days = diffDays > 0 ? diffDays : 0;
+  }
+}
 
+if (field === "meter_delivery_date" || field === "contractual_delivery_date") {
+  const meterDeliveryDate = new Date(updatedLots[lotIndex].meter_delivery_date ?? '');
+  const contractualDeliveryDate = new Date(updatedLots[lotIndex].contractual_delivery_date ?? '');
 
-        updatedLots[lotIndex].inspection_delay_days =
-          diffDays > 0 ? diffDays : 0;
-      }
-    }
+  if (!isNaN(meterDeliveryDate.getTime()) && !isNaN(contractualDeliveryDate.getTime())) {
+    const diffMs = meterDeliveryDate.getTime() - contractualDeliveryDate.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    updatedLots[lotIndex].accessories_delay_days = diffDays > 0 ? diffDays : 0;
+  }
+}
 
-    if (field === "actual_delivery_date" || field === "contractual_delivery_date") {
-      const actualDeliveryDate = new Date(updatedLots[lotIndex].actual_delivery_date);
-      const contractualDeliveryDate = new Date(updatedLots[lotIndex].contractual_delivery_date);
+if (field === "dispatch_clearance_date" ||
+  field === "actual_inspection_date" ||
+  field === "inspection_date_advised" ||
+  field === "no_of_inspection_days") {
+  const x = (updatedLots[lotIndex].dispatch_clearance_delay || 0) + (updatedLots[lotIndex].inspection_delay_days || 0);
+  updatedLots[lotIndex].delay_by_dewa = x > 0 ? x : 0;
+}
 
-      if (!isNaN(actualDeliveryDate.getTime()) && !isNaN(contractualDeliveryDate.getTime())) {
-        const diffMs = actualDeliveryDate - contractualDeliveryDate;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+if (field === "actual_delivery_date" ||
+  field === "contractual_delivery_date" ||
+  field === "actual_inspection_date" ||
+  field === "inspection_date_advised" ||
+  field === "no_of_inspection_days" ||
+  field === "dispatch_clearance_date" ||
+  field === "other_delay_by_dewa") {
+  const x = (updatedLots[lotIndex].main_units_delay_days || 0) - (updatedLots[lotIndex].delay_by_dewa || 0) - (updatedLots[lotIndex].other_delay_by_dewa || 0);
+  updatedLots[lotIndex].ld_delay_units = x > 0 ? x : 0;
+}
 
-        updatedLots[lotIndex].main_units_delay_days =
-          diffDays > 0 ? diffDays : 0;
-      }
-    }
+if (field === "meter_delivery_date" ||
+  field === "contractual_delivery_date" ||
+  field === "actual_inspection_date" ||
+  field === "inspection_date_advised" ||
+  field === "no_of_inspection_days" ||
+  field === "dispatch_clearance_date" ||
+  field === "other_delay_by_dewa") {
+  const x = (updatedLots[lotIndex].accessories_delay_days || 0) - (updatedLots[lotIndex].delay_by_dewa || 0) - (updatedLots[lotIndex].other_delay_by_dewa || 0);
+  updatedLots[lotIndex].ld_delay_meters = x > 0 ? x : 0;
+}
 
-    if (field === "meter_delivery_date" || field === "contractual_delivery_date") {
-      const meterDeliveryDate = new Date(updatedLots[lotIndex].meter_delivery_date);
-      const contractualDeliveryDate = new Date(updatedLots[lotIndex].contractual_delivery_date);
+if (field === "actual_delivery_date" || field === "payment_received_date") {
+  const actualDeliveryDate = new Date(updatedLots[lotIndex].actual_delivery_date ?? '');
+  const paymentReceivedDate = new Date(updatedLots[lotIndex].payment_received_date ?? '');
 
-      if (!isNaN(meterDeliveryDate.getTime()) && !isNaN(contractualDeliveryDate.getTime())) {
-        const diffMs = meterDeliveryDate - contractualDeliveryDate;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-        updatedLots[lotIndex].accessories_delay_days =
-          diffDays > 0 ? diffDays : 0;
-      }
-    }
-
-
-    if (field === "dispatch_clearance_date" ||
-      field === "actual_inspection_date" ||
-      field === "inspection_date_advised" || field == "no_of_inspection_days") {
-
-        const x = (updatedLots[lotIndex].dispatch_clearance_delay || 0) + (updatedLots[lotIndex].inspection_delay_days || 0)  
-      updatedLots[lotIndex].delay_by_dewa = x > 0 ? x : 0
-    }
-
-    if (field === "actual_delivery_date" ||
-      field === "contractual_delivery_date" ||
-      field === "actual_inspection_date" ||
-      field === "inspection_date_advised" ||
-      field == "no_of_inspection_days" ||
-      field === "dispatch_clearance_date" ||
-      field === "other_delay_by_dewa") {
-        const x = (updatedLots[lotIndex].main_units_delay_days || 0) - (updatedLots[lotIndex].delay_by_dewa || 0) - (updatedLots[lotIndex].other_delay_by_dewa || 0)
-      updatedLots[lotIndex].ld_delay_units = x > 0 ? x : 0
-    }
-    if (field === "meter_delivery_date" ||
-      field === "contractual_delivery_date" ||
-      field === "actual_inspection_date" ||
-      field === "inspection_date_advised" ||
-      field == "no_of_inspection_days" ||
-      field === "dispatch_clearance_date" ||
-      field === "other_delay_by_dewa") {
-        const x = (updatedLots[lotIndex].accessories_delay_days || 0) - (updatedLots[lotIndex].delay_by_dewa || 0) - (updatedLots[lotIndex].other_delay_by_dewa || 0) 
-      updatedLots[lotIndex].ld_delay_meters = x > 0 ? x : 0
-    }
-
-    if (field === "actual_delivery_date" || "payment_received_date"){
-      const actualDeliveryDate = new Date(updatedLots[lotIndex].actual_delivery_date);
-      const paymentReceivedDate = new Date(updatedLots[lotIndex].payment_received_date);
-
-      if (!isNaN(actualDeliveryDate.getTime()) && !isNaN(paymentReceivedDate.getTime())) {
-        const diffMs = paymentReceivedDate - actualDeliveryDate;
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-
-        updatedLots[lotIndex].delay_in_payment_days =
-          diffDays > 0 ? diffDays : 0;
-      }
-    }
-
+  if (!isNaN(actualDeliveryDate.getTime()) && !isNaN(paymentReceivedDate.getTime())) {
+    const diffMs = paymentReceivedDate.getTime() - actualDeliveryDate.getTime();
+    const diffDays = diffMs / (1000 * 60 * 60 * 24);
+    updatedLots[lotIndex].delay_in_payment_days = diffDays > 0 ? diffDays : 0;
+  }
+}
     if ((updatedLots[lotIndex].ld_delay_units_or_meters === 0 && updatedLots[lotIndex].force_majeure === 1) && (field === "force_majeure" || field === "ld_delay_units_or_meters" || field === "force_majeure_days" || field === "ld_delay_units")) {
       updatedLots[lotIndex].actual_delay_for_ld = (Number(updatedLots[lotIndex].force_majeure_days!) + Number(updatedLots[lotIndex].ld_delay_units!))
     }

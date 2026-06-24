@@ -251,7 +251,7 @@ export default function OrderItemsTable({
               discount_type: discountType,
               discount_percent: item.discount_percent ? String(item.discount_percent) : '',
               discount_amount: item.discount_amount ? String(item.discount_amount) : '',
-              discount_value: item.discount_value ? Number(item.discount_value) : '',
+              discount_value: item.discount_value ? String(item.discount_value) : '',
               discount_per_unit: formatNumberForDisplay(discountPerUnit),
               value_after_discount: formatNumberForDisplay(roundTo4Decimals(totalValue - (item.discount_value || 0))),
             }
