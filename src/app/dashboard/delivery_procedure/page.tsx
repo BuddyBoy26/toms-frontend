@@ -144,7 +144,7 @@ export default function DeliveryProcedurePage() {
     { key: 'lot_no_dewa', header: 'Lot No (DEWA)' },
     { key: 'document_status', header: 'Document Status' },
     { key: 'cd_exemption', header: 'CD Exemption' },
-    { key: 'cepa_ddu', header: 'CEPA/DDU' },
+    { key: 'cepa_ddu', header: 'DEWA Exemption / CEPA' },
     { key: 'asn_no', header: 'ASN No' },
     { key: 'delivery_note_no', header: 'Delivery Note No' },
     { key: 'delivery_date', header: 'Delivery Date' },

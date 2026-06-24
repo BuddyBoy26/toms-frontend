@@ -91,7 +91,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen">
       <aside className="w-60 bg-gray-100 p-4 overflow-y-auto flex flex-col">
-        <h2 className="text-lg font-semibold mb-4">KK Abbas Admin</h2>
+        <Link href="/dashboard/"><h2 className="text-lg font-semibold mb-4">KK Abbas Admin</h2></Link>
         <nav className="flex-1 space-y-2">
           {NAV_GROUPS.map(group => (
             <div key={group.title}>

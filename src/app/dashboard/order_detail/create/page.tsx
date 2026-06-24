@@ -4,6 +4,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Loader from '@/components/Loader'
+import { triggerReminders } from '@/utils/reminderTrigger'
 
 type CurrencyEnum = 'AED' | 'EUR' | 'USD'
 
@@ -90,7 +91,7 @@ export default function OrderDetailCreatePage() {
     tender_id: '' as number | '',
     po_number: '',
     order_date: '',
-    po_commencement_date: '',
+    po_commencemnt_date: '',
     order_value: '',
     currency: 'AED' as CurrencyEnum,
     order_value_aed: '',
@@ -241,7 +242,7 @@ export default function OrderDetailCreatePage() {
     setFormData({
       ...formData,
       order_date: date,
-      po_commencement_date: date,
+      po_commencemnt_date: date,
     })
   }
 
@@ -274,7 +275,7 @@ export default function OrderDetailCreatePage() {
       po_number: formData.po_number,
       order_description: orderDescription,
       order_date: formData.order_date,
-      po_commencement_date: formData.po_commencement_date || null,
+      po_commencemnt_date: formData.po_commencemnt_date || null,
       order_value: parseFormattedNumber(formData.order_value),
       currency: formData.currency,
       order_value_aed: parseFormattedNumber(formData.order_value_aed),
@@ -309,6 +310,7 @@ export default function OrderDetailCreatePage() {
       })
 
       if (response.ok) {
+        triggerReminders('order_details')
         router.push('/dashboard/order_detail')
       } else {
         const err = await response.json().catch(() => null)
@@ -342,7 +344,13 @@ export default function OrderDetailCreatePage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+      e.preventDefault()
+    }
+  }}
+  onSubmit={handleSubmit} className="space-y-4">
         {/* Basic Information */}
         <div className="bg-white rounded-lg shadow p-4">
           <h2 className="text-lg font-semibold mb-3 pb-2 border-b">Basic Information</h2>
@@ -403,9 +411,9 @@ export default function OrderDetailCreatePage() {
                 </label>
                 <input
                   type="date"
-                  value={formData.po_commencement_date}
+                  value={formData.po_commencemnt_date}
                   onChange={(e) =>
-                    setFormData({ ...formData, po_commencement_date: e.target.value })
+                    setFormData({ ...formData, po_commencemnt_date: e.target.value })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   required

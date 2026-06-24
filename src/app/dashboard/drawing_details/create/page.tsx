@@ -114,7 +114,13 @@ export default function CreateDrawingPage() {
   return (
     <div className="max-w-4xl p-6">
       <h1 className="text-xl font-semibold mb-4">Create Drawing Details</h1>
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+      e.preventDefault()
+    }
+  }}
+  onSubmit={handleSubmit} className="space-y-5">
         {error && <p className="text-red-600 text-sm">{error}</p>}
 
         <div className={section3}>

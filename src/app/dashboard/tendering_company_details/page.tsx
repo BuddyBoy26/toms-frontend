@@ -44,6 +44,12 @@ interface Company {
   company_name: string
 }
 
+interface TenderCompanyItem {
+  id: number
+  tendering_companies_id: number
+  value_aed: number | null
+}
+
 /** Composed row shape for the table */
 interface Row {
   tendering_companies_id: number
@@ -52,6 +58,7 @@ interface Row {
   fees: string
   invite_date: string
   closing_date: string
+  total_items_value: string
   tbg_amount: string
   company: string
   tender_bought: string
@@ -88,6 +95,7 @@ export default function TenderingCompaniesListPage() {
   const [tcs, setTcs] = useState<TenderingCompany[]>([])
   const [tenders, setTenders] = useState<Tender[]>([])
   const [companies, setCompanies] = useState<Company[]>([])
+  const [tcItems, setTcItems] = useState<TenderCompanyItem[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -99,23 +107,26 @@ export default function TenderingCompaniesListPage() {
     const token = localStorage.getItem('kkabbas_token')
     setLoading(true)
     try {
-      const [tcRes, tendRes, compRes] = await Promise.all([
+      const [tcRes, tendRes, compRes, itemsRes] = await Promise.all([
         fetch(`${API}/tendering_companies`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API}/tender`, { headers: { Authorization: `Bearer ${token}` } }),
         fetch(`${API}/company_master`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/tender_company_items`, { headers: { Authorization: `Bearer ${token}` } }),
       ])
 
       if (!tcRes.ok) throw new Error(`Failed to load tendering companies (${tcRes.status})`)
       if (!tendRes.ok) throw new Error(`Failed to load tenders (${tendRes.status})`)
       if (!compRes.ok) throw new Error(`Failed to load companies (${compRes.status})`)
+      if (!itemsRes.ok) throw new Error(`Failed to load tender company items (${itemsRes.status})`)
 
-      const [tcData, tenderData, companyData] = await Promise.all([
-        tcRes.json(), tendRes.json(), compRes.json()
+      const [tcData, tenderData, companyData, itemsData] = await Promise.all([
+        tcRes.json(), tendRes.json(), compRes.json(), itemsRes.json()
       ])
 
       setTcs(Array.isArray(tcData) ? tcData : [])
       setTenders(Array.isArray(tenderData) ? tenderData : [])
       setCompanies(Array.isArray(companyData) ? companyData : [])
+      setTcItems(Array.isArray(itemsData) ? itemsData : [])
     } catch (e: unknown) {
       setError((e as Error)?.message || 'Failed to load list')
     } finally {
@@ -135,6 +146,16 @@ export default function TenderingCompaniesListPage() {
     return m
   }, [companies])
 
+  // Sum value_aed per tendering_companies_id
+  const itemsValueMap = useMemo(() => {
+    const m = new Map<number, number>()
+    for (const item of tcItems) {
+      const val = Number(item.value_aed) || 0
+      m.set(item.tendering_companies_id, (m.get(item.tendering_companies_id) || 0) + val)
+    }
+    return m
+  }, [tcItems])
+
   const yn = (v: 0 | 1 | boolean | null | undefined) => (v ? 'Y' : 'N')
   const fmt = (v: unknown) => (v === null || v === undefined || v === '' ? '-' : String(v))
 
@@ -142,6 +163,7 @@ export default function TenderingCompaniesListPage() {
     return tcs.map(tc => {
       const t = tenderMap.get(tc.tender_id)
       const c = companyMap.get(tc.company_id)
+      const totalItemsValue = itemsValueMap.get(tc.tendering_companies_id)
 
       return {
         tendering_companies_id: tc.tendering_companies_id,
@@ -150,6 +172,7 @@ export default function TenderingCompaniesListPage() {
         fees: t?.tender_fees != null ? formatNumber(t.tender_fees) : '-',
         invite_date: fmt(t?.tender_date),
         closing_date: fmt(t?.closing_date),
+        total_items_value: totalItemsValue != null ? formatNumber(totalItemsValue) : '-',
         tbg_amount: tc.tbg_value != null ? formatNumber(tc.tbg_value) : '-',
         company: fmt(c?.company_name),
         tender_bought: yn(tc.tender_bought),
@@ -160,8 +183,8 @@ export default function TenderingCompaniesListPage() {
         memo: yn(tc.memo),
         po_copies: yn(tc.po_copies),
       }
-    }).sort((a, b) => b.tendering_companies_id - a.tendering_companies_id) // Sort by ID desc
-  }, [tcs, tenderMap, companyMap])
+    }).sort((a, b) => b.tendering_companies_id - a.tendering_companies_id)
+  }, [tcs, tenderMap, companyMap, itemsValueMap])
 
   const columns: Column<Row>[] = [
     { key: 'tendering_companies_id', header: 'ID' },
@@ -171,6 +194,7 @@ export default function TenderingCompaniesListPage() {
     { key: 'fees', header: 'Fees' },
     { key: 'invite_date', header: 'Invite Date' },
     { key: 'closing_date', header: 'Closing Date' },
+    { key: 'total_items_value', header: 'Total Items Value' },
     { key: 'tbg_amount', header: 'TBG Amount' },
     { key: 'tender_bought', header: 'Tender' },
     { key: 'participated', header: 'Participated?' },

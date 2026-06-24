@@ -3,6 +3,7 @@
 
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState, useMemo } from 'react'
+import { triggerReminders } from '@/utils/reminderTrigger'
 
 type CurrencyEnum = 'AED' | 'EUR' | 'USD'
 type CepaDduEnum = 0 | 1 // 0: CEPA, 1: DDU
@@ -468,6 +469,7 @@ export default function DeliveryProcedureEditPage() {
       })
 
       if (response.ok) {
+        triggerReminders('delivery_procedure')
         router.push('/dashboard/delivery_procedure')
       } else {
         const err = await response.json().catch(() => null)
@@ -501,7 +503,13 @@ export default function DeliveryProcedureEditPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+      e.preventDefault()
+    }
+  }}
+  onSubmit={handleSubmit} className="space-y-4">
         {/* Selection Section - PO → Shipment → Item → Lot */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <h2 className="text-lg font-semibold mb-3">Selection (Cascading Filters)</h2>
@@ -792,25 +800,25 @@ export default function DeliveryProcedureEditPage() {
 
         {/* CEPA/DDU */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
-          <h2 className="text-lg font-semibold mb-3">CEPA / DDU</h2>
+          <h2 className="text-lg font-semibold mb-3">DEWA Exemption / CEPA</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                CEPA / DDU Type
+                Type
               </label>
               <select
                 value={formData.cepa_ddu}
                 onChange={(e) => setFormData({ ...formData, cepa_ddu: Number(e.target.value) as CepaDduEnum })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
               >
-                <option value="0">CEPA</option>
-                <option value="1">DDU</option>
+                <option value="0">DEWA Exemption</option>
+                <option value="1">CEPA</option>
               </select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                CEPA / DDU Date
+                Date
               </label>
               <input
                 type="date"

@@ -4,6 +4,9 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'  // ADD THIS LINE
 import Loader from '@/components/Loader'
+import { triggerReminders } from '@/utils/reminderTrigger'
+import NumericInput from '@/components/NumericInput'
+ 
 
 type CurrencyEnum = 'AED' | 'EUR' | 'USD'
 
@@ -401,7 +404,7 @@ export default function LotMonitoringPage() {
     if (field === 'contractual_delivery_date') {
       const d = new Date(updatedLots[lotIndex].contractual_delivery_date);
       d.setDate(d.getDate() - 60);
-      updatedLots[lotIndex].inspection_call_date_act = d.toISOString().split('T')[0]; // keeps it in "YYYY-MM-DD"
+      updatedLots[lotIndex].inspection_call_date_tent = d.toISOString().split('T')[0]; // keeps it in "YYYY-MM-DD"
     }
 
     if (field === "dispatch_clearance_date" || field === "actual_inspection_date" || field === "no_of_inspection_days") {
@@ -490,6 +493,19 @@ export default function LotMonitoringPage() {
       updatedLots[lotIndex].ld_delay_meters = x > 0 ? x : 0
     }
 
+    if (field === "actual_delivery_date" || "payment_received_date"){
+      const actualDeliveryDate = new Date(updatedLots[lotIndex].actual_delivery_date);
+      const paymentReceivedDate = new Date(updatedLots[lotIndex].payment_received_date);
+
+      if (!isNaN(actualDeliveryDate.getTime()) && !isNaN(paymentReceivedDate.getTime())) {
+        const diffMs = paymentReceivedDate - actualDeliveryDate;
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+        updatedLots[lotIndex].delay_in_payment_days =
+          diffDays > 0 ? diffDays : 0;
+      }
+    }
+
     if ((updatedLots[lotIndex].ld_delay_units_or_meters === 0 && updatedLots[lotIndex].force_majeure === 1) && (field === "force_majeure" || field === "ld_delay_units_or_meters" || field === "force_majeure_days" || field === "ld_delay_units")) {
       updatedLots[lotIndex].actual_delay_for_ld = (Number(updatedLots[lotIndex].force_majeure_days!) + Number(updatedLots[lotIndex].ld_delay_units!))
     }
@@ -516,7 +532,7 @@ export default function LotMonitoringPage() {
       updatedLots[lotIndex].pending_quantity = x > 0 ? x : 0
     }
 
-    if (field === "item_total_value"){
+    if (field === "item_total_value" || field === "item_unit_price" || field === "quantity" || field === "delivery_total_value"){
       const x = Number(updatedLots[lotIndex].item_total_value) - Number(updatedLots[lotIndex].delivery_total_value || 0)
       updatedLots[lotIndex].commission_amount_for_lot = x > 0 ? x * commissionRate / 100 : 0
     }
@@ -542,6 +558,11 @@ export default function LotMonitoringPage() {
       field === "no_of_inspection_days" || field === "other_delay_by_dewa" ) {
         const x = (updatedLots[lotIndex].accessories_delay_days || 0) - (updatedLots[lotIndex].delay_by_dewa || 0) - (updatedLots[lotIndex].other_delay_by_dewa || 0)
       updatedLots[lotIndex].ld_delay_units = x > 0 ? x : 0
+    }
+    if (updatedLots[lotIndex].actual_delay_for_ld){
+    updatedLots[lotIndex].actual_ld_amount = (updatedLots[lotIndex].actual_delay_for_ld)/7*0.0125*(updatedLots[lotIndex].item_total_value)
+    updatedLots[lotIndex].max_ld_amount = 0.1*(updatedLots[lotIndex].item_total_value)
+    updatedLots[lotIndex].chargeable_ld_amount = updatedLots[lotIndex].actual_ld_amount < updatedLots[lotIndex].max_ld_amount ? updatedLots[lotIndex].actual_ld_amount : updatedLots[lotIndex].max_ld_amount 
     }
 
 
@@ -570,6 +591,9 @@ export default function LotMonitoringPage() {
 
         if (!response.ok) {
           throw new Error('Failed to delete lot')
+        }
+        else {
+          triggerReminders('lot_monitoring')
         }
       } catch (e: any) {
         setError(e.message || 'Failed to delete lot')
@@ -704,6 +728,9 @@ export default function LotMonitoringPage() {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.detail || 'Failed to save lot')
+      }
+      else {
+        triggerReminders('lot_monitoring')
       }
     }
   }
@@ -1406,7 +1433,7 @@ export default function LotMonitoringPage() {
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Payment Date</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Payment Delay</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Reason Payment Delay</th>
-                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Commission Lot</th>
+                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Commission For Lot</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Commission Delivered Qty</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Commission Invoice No</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Commission Invoice Date</th>
@@ -1479,10 +1506,9 @@ export default function LotMonitoringPage() {
                                       />
                                     </td>
                                     <td className="px-2 py-2">
-                                      <input
-                                        type="text"
-                                        value={formatNumber(lot.invoice_value)}
-                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'invoice_value', parseFormattedNumber(e.target.value))}
+                                      <NumericInput
+  value={lot.invoice_value}
+                                        onChange={(val) => updateLot(orderItem.order_item_detail_id, lotIndex, 'invoice_value', val)}
                                         className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
@@ -1503,18 +1529,16 @@ export default function LotMonitoringPage() {
                                       />
                                     </td>
                                     <td className="px-2 py-2">
-                                      <input
-                                        type="text"
-                                        value={formatNumber(lot.srm_invoice_value)}
-                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'srm_invoice_value', parseFormattedNumber(e.target.value))}
+                                      <NumericInput
+  value={lot.srm_invoice_value}
+                                        onChange={(val) => updateLot(orderItem.order_item_detail_id, lotIndex, 'srm_invoice_value', val)}
                                         className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
                                     <td className="px-2 py-2">
-                                      <input
-                                        type="text"
-                                        value={formatNumber(lot.payment_amount_received)}
-                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'payment_amount_received', parseFormattedNumber(e.target.value))}
+                                      <NumericInput
+  value={lot.payment_amount_received}
+                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'payment_amount_received', e)}
                                         className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
@@ -1530,7 +1554,8 @@ export default function LotMonitoringPage() {
                                       <input
                                         type="number"
                                         value={lot.delay_in_payment_days || ''}
-                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'delay_in_payment_days', e.target.value)}
+                                        readOnly
+                                        // onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'delay_in_payment_days', e.target.value)}
                                         className="w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
@@ -1543,18 +1568,16 @@ export default function LotMonitoringPage() {
                                       />
                                     </td>
                                     <td className="px-2 py-2">
-                                      <input
-                                        type="text"
-                                        value={formatNumber(lot.commission_amount_for_lot)}
-                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'commission_amount_for_lot', parseFormattedNumber(e.target.value))}
+                                      <NumericInput
+  value={lot.commission_amount_for_lot}
+                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'commission_amount_for_lot', e)}
                                         className="w-22 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
                                     <td className="px-2 py-2">
-                                      <input
-                                        type="text"
-                                        value={formatNumber(lot.commission_amount_for_delivered_quantity)}
-                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'commission_amount_for_delivered_quantity', parseFormattedNumber(e.target.value))}
+                                      <NumericInput
+  value={lot.commission_amount_for_delivered_quantity}
+                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'commission_amount_for_delivered_quantity', e)}
                                         className="w-22 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
@@ -1576,10 +1599,9 @@ export default function LotMonitoringPage() {
                                     </td>
                                     
                                     <td className="px-2 py-2">
-                                      <input
-                                        type="text"
-                                        value={formatNumber(lot.commission_amount_invoiced)}
-                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'commission_amount_invoiced', parseFormattedNumber(e.target.value))}
+                                      <NumericInput
+  value={lot.commission_amount_invoiced}
+                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'commission_amount_invoiced', e)}
                                         className="w-22 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
@@ -1592,10 +1614,9 @@ export default function LotMonitoringPage() {
                                       />
                                     </td>
                                     <td className="px-2 py-2">
-                                      <input
-                                        type="text"
-                                        value={formatNumber(lot.balance_commission_amount)}
-                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'balance_commission_amount', parseFormattedNumber(e.target.value))}
+                                      <NumericInput
+  value={lot.balance_commission_amount}
+                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'balance_commission_amount', e)}
                                         className="w-22 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
@@ -1770,26 +1791,23 @@ export default function LotMonitoringPage() {
                                       />
                                     </td>
                                     <td className="px-2 py-2">
-                                      <input
-                                        type="text"
-                                        value={formatNumber(lot.actual_ld_amount)}
-                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'actual_ld_amount', parseFormattedNumber(e.target.value))}
+                                      <NumericInput
+  value={lot.actual_ld_amount}
+                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'actual_ld_amount', e)}
                                         className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
                                     <td className="px-2 py-2">
-                                      <input
-                                        type="text"
-                                        value={formatNumber(lot.max_ld_amount)}
-                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'max_ld_amount', parseFormattedNumber(e.target.value))}
+                                      <NumericInput
+  value={lot.max_ld_amount}
+                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'max_ld_amount', e)}
                                         className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
                                     <td className="px-2 py-2">
-                                      <input
-                                        type="text"
-                                        value={formatNumber(lot.chargeable_ld_amount)}
-                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'chargeable_ld_amount', parseFormattedNumber(e.target.value))}
+                                      <NumericInput
+  value={lot.chargeable_ld_amount}
+                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'chargeable_ld_amount', e)}
                                         className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>

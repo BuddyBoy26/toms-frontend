@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState, useMemo } from 'react'
 import TenderCompanyItemsTable from '@/components/TenderCompanyItemsTable'
 import { generatePDF } from '@/utils/pdfGenerator'
+import { triggerReminders } from '@/utils/reminderTrigger'
 
 type CurrencyEnum = 'AED' | 'EUR' | 'USD'
 
@@ -659,7 +660,7 @@ export default function TenderingCompanyEditPage() {
           if (!cgResponse.ok) console.warn("Failed to create Counter Guarantee")
         }
       }
-
+      triggerReminders('tendering_companies')
       router.push('/dashboard/tendering_company_details')
     } catch (error: any) {
       console.error('Error:', error)
@@ -689,7 +690,13 @@ export default function TenderingCompanyEditPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+      e.preventDefault()
+    }
+  }}
+  onSubmit={handleSubmit} className="space-y-4">
         {/* Basic Information */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <h2 className="text-lg font-semibold mb-3">Basic Information</h2>

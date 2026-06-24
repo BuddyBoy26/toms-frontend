@@ -3,6 +3,8 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { triggerReminders } from '@/utils/reminderTrigger'
+ 
 
 type CurrencyEnum = 'AED' | 'EUR' | 'USD'
 
@@ -399,6 +401,7 @@ export default function LotMonitoringCreatePage() {
       })
 
       if (response.ok) {
+        triggerReminders('lot_monitoring')
         router.push('/dashboard/lot_monitoring')
       } else {
         const err = await response.json().catch(() => null)
@@ -432,7 +435,13 @@ export default function LotMonitoringCreatePage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+      e.preventDefault()
+    }
+  }}
+  onSubmit={handleSubmit} className="space-y-4">
         {/* Lot Monitoring Information */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">
           <h2 className="text-lg font-semibold mb-3">Lot Monitoring Information</h2>

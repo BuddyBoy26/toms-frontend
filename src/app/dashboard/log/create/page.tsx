@@ -110,7 +110,13 @@ export default function LogEditPage() {
 
       {error && <p className="text-red-600 mb-3">{error}</p>}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+      e.preventDefault()
+    }
+  }}
+  onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium">Title</label>
           <input

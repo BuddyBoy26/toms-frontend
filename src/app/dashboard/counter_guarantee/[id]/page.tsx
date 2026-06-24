@@ -104,7 +104,13 @@ export default function CGEditPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+      e.preventDefault()
+    }
+  }}
+  onSubmit={handleSubmit} className="space-y-6">
         
         {/* Core Details */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">

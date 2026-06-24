@@ -3,6 +3,7 @@
 
 import { useRouter, useParams } from 'next/navigation'
 import { useEffect, useState, useMemo } from 'react'
+import { usePageTitle } from '@/hooks/usePageTitle'
 
 interface OrderDetail { order_id: number; po_number: string; order_description: string }
 interface OrderItemDetail { order_item_detail_id: number; item_no_dewa: string; item_master_description: string }
@@ -14,6 +15,7 @@ const formatDateString = (dateStr: string | null | undefined): string => {
 }
 
 export default function DiscrepancyEditPage() {
+  usePageTitle(`Edit Discrepancy`)
   const router = useRouter()
   const params = useParams()
   const id = params.id as string
@@ -43,7 +45,6 @@ export default function DiscrepancyEditPage() {
 
   useEffect(() => {
     const token = localStorage.getItem('kkabbas_token')
-    
     fetch(`${API}/discrepancy/${id}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => res.json())
       .then(async (discData) => {
@@ -193,7 +194,13 @@ export default function DiscrepancyEditPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+      e.preventDefault()
+    }
+  }}
+  onSubmit={handleSubmit} className="space-y-6">
         
         {/* TOP SECTION: PO, ITEM, LOT */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">

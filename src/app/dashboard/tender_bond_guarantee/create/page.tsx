@@ -4,6 +4,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
+import { triggerReminders } from '@/utils/reminderTrigger'
 
 interface Order { order_id: number; po_number: string }
 
@@ -134,6 +135,7 @@ export default function CreatePerformanceGuaranteePage() {
       setError(msg)
       toast.error(msg)
     } else {
+      triggerReminders('performance_guarantee')
       toast.success('Performance Guarantee created')
       router.push('/dashboard/performance_guarantee')
     }
@@ -147,7 +149,13 @@ export default function CreatePerformanceGuaranteePage() {
   return (
     <div className="max-w-6xl p-6">
       <h1 className="text-xl font-semibold mb-4">Create Performance Guarantee</h1>
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+      e.preventDefault()
+    }
+  }}
+  onSubmit={handleSubmit} className="space-y-5">
         {error && <p className="text-red-600 text-sm">{error}</p>}
 
         <div className={section3}>

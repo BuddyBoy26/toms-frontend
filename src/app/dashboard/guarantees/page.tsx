@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Loader from '@/components/Loader'
+import { triggerReminders } from '@/utils/reminderTrigger'
 
 type ViewMode = 'guarantees' | 'po_tender'
 
@@ -125,6 +126,8 @@ export default function GuaranteesDashboard() {
       setRawOrders(orders)
       setRawTenders(tenders)
       setRawTcItems(tcItems)
+
+      console.log(mpgs)
 
       mapGridData(cgs, tcs, mpgs, pbgs, orders, tenders, tcItems)
       
@@ -357,6 +360,7 @@ export default function GuaranteesDashboard() {
       gPayload.tender_extension_dates = payloadSource.extension_dates_array || parseDateArray(payloadSource.tender_extension_dates || '')
       gPayload.remarks = payloadSource.remarks || payloadSource.rawGuarantee.remarks || null
       gUrl = `${API}/tendering_companies/${payloadSource.id}`
+      triggerReminders('performance_guarantee')
 
     } else if (type === 'MPG') {
       gPayload.participated = payloadSource.participated ?? gPayload.participated
@@ -373,6 +377,8 @@ export default function GuaranteesDashboard() {
       gPayload.remarks = payloadSource.remarks || payloadSource.rawGuarantee.remarks || null
       gPayload.pending_status = payloadSource.status || gPayload.pending_status
       gUrl = `${API}/material_performance_guarantee/${payloadSource.id}`
+      console.log("trigger mpg")
+      triggerReminders('material_performance_guarantee')
 
     } else if (type === 'PBG') {
       gPayload.pg_bank_or_deposit = payloadSource.bank_or_deposit ?? payloadSource.pg_bank_or_deposit
@@ -382,12 +388,14 @@ export default function GuaranteesDashboard() {
       gPayload.pg_value = parseFormattedNumber(payloadSource.guarantee_value || payloadSource.pg_value)
       gPayload.pg_expiry_date = payloadSource.expiry_date || payloadSource.pg_expiry_date || null
       gPayload.pg_submitted_date = payloadSource.submitted_date || payloadSource.pg_submitted_date || null
+      gPayload.pbg_date = payloadSource.pbg_date || null
       gPayload.pg_release_date_dewa = payloadSource.release_date_dewa || payloadSource.pg_release_date_dewa || null
       gPayload.pg_release_date_bank = payloadSource.release_date_bank || payloadSource.pg_release_date_bank || null
       gPayload.pg_extension_dates = payloadSource.extension_dates_array || parseDateArray(payloadSource.extension_dates || '')
       gPayload.remarks = payloadSource.remarks || payloadSource.rawGuarantee.remarks || null
       gPayload.pending_status = payloadSource.status || gPayload.pending_status
       gUrl = `${API}/performance_guarantee/${payloadSource.id}`
+      triggerReminders('performance_guarantee')
     }
 
     const gRes = await fetch(gUrl, { method: 'PUT', headers, body: JSON.stringify(gPayload) })
@@ -446,10 +454,23 @@ export default function GuaranteesDashboard() {
 
   const saveAllForms = async () => {
     setSaving(true); setError(null);
+    console.log("trigger?")
     try {
-      if (formTbg) await executeSave(formTbg, 'TBG')
-      if (formMpg) await executeSave(formMpg, 'MPG')
-      if (formPbg) await executeSave(formPbg, 'PBG')
+      if (formTbg) {
+        await executeSave(formTbg, 'TBG')
+        triggerReminders('performance_guarantee')
+      }
+      if (formMpg) {
+        console.log("trigger mpg")
+        triggerReminders('material_performance_guarantee')
+        await executeSave(formMpg, 'MPG')
+        console.log("trigger mpg")
+        triggerReminders('material_performance_guarantee')
+      }
+      if (formPbg) {
+        await executeSave(formPbg, 'PBG')
+        triggerReminders('performance_guarantee')
+      }
       await fetchAllData()
     } catch (e: any) { setError(e.message) } finally { setSaving(false) }
   }
@@ -505,6 +526,7 @@ export default function GuaranteesDashboard() {
   const filteredTbgRows = statusFilter === 'All' ? tbgRows : tbgRows.filter(r => r.status === statusFilter || (statusFilter === 'NOT Issued' && r.status === 'N/A'))
   const filteredMpgRows = statusFilter === 'All' ? mpgRows : mpgRows.filter(r => r.status === statusFilter)
   const filteredPbgRows = statusFilter === 'All' ? pbgRows : pbgRows.filter(r => r.status === statusFilter)
+  console.log(filteredPbgRows)
 
   if (loading && rawTenders.length === 0) return <Loader />
 
@@ -665,6 +687,91 @@ export default function GuaranteesDashboard() {
             </div>
           </div>
 
+          {/* PBG Grid */}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-md font-semibold text-purple-700">Performance Bond Guarantees (PBG)</h3>
+                <button onClick={() => toggleSection("pbg")} className="text-xs px-2 py-1 border rounded hover:bg-gray-100">
+                  {collapsedSections.pbg ? "Expand" : "Minimise"}
+                </button>
+              </div>
+              {!collapsedSections.pbg && (
+                <>
+                  <div className="overflow-x-auto border border-gray-200 rounded-md">
+                    <table className="min-w-full divide-y divide-gray-200 text-sm">
+                      <thead className="bg-purple-50">
+                        <tr>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">PO No</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Guarantee No</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Type</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Bank / Receipt No</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Value</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">PBG Date</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">PBG Date</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Expiry Date</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">DEWA Release</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Bank Release</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Extension Dates</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Pending Status</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Remarks</th>
+                          <th className="px-2 py-2 text-center text-xs font-bold text-blue-700 uppercase border-r border-purple-200">Edit Page</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase border-l-2 border-gray-300">CG Ref</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">CG Date</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">CG Bank</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">CG Expiry</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">CG Status</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">CG Remarks</th>
+                          <th className="px-2 py-2 text-center text-xs font-bold text-blue-700 uppercase border-l border-purple-200">CG Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {filteredPbgRows.map((row, index) => (
+                          <tr key={row.id} className="hover:bg-gray-50">
+                            <td className="px-2 py-2 text-gray-700 font-medium whitespace-nowrap">{row.ref_doc_no}</td>
+                            <td className="px-2 py-2"><input type="text" value={row.guarantee_no || ''} onChange={(e) => handleGridRowChange('PBG', index, 'guarantee_no', e.target.value)} className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><select value={row.pg_bank_or_deposit} onChange={(e) => handleGridRowChange('PBG', index, 'bank_or_deposit', Number(e.target.value))} className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"><option value="0">Bank</option><option value="1">Deposit</option></select></td>
+                            <td className="px-2 py-2"><input type="text" value={row.pg_bank_or_deposit === 0 ? row.pg_issuing_bank : row.pg_deposit_receipt_no} onChange={(e) => handleGridRowChange('PBG', index, row.pg_bank_or_deposit === 0 ? 'issuing_bank' : 'deposit_receipt_no', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="text" value={formatNumber(row.guarantee_value || '')} onChange={(e) => handleGridRowChange('PBG', index, 'guarantee_value', formatNumber(e.target.value))} className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="date" value={row.pbg_date || ''} onChange={(e) => handleGridRowChange('PBG', index, 'pbg_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="date" value={row.pg_submitted_date || ''} onChange={(e) => handleGridRowChange('PBG', index, 'submitted_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="date" value={row.expiry_date || ''} onChange={(e) => handleGridRowChange('PBG', index, 'expiry_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="date" value={row.pg_release_date_dewa || ''} onChange={(e) => handleGridRowChange('PBG', index, 'release_date_dewa', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="date" value={row.pg_release_date_bank || ''} onChange={(e) => handleGridRowChange('PBG', index, 'release_date_bank', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="text" value={row.pg_extension_dates || ''} onChange={(e) => handleGridRowChange('PBG', index, 'extension_dates', e.target.value)} placeholder="YYYY-MM-DD, ..." className="w-32 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2">{renderGridStatusDropdown(row.status || 'NOT Issued', (val) => handleGridRowChange('PBG', index, 'status', val))}</td>
+                            <td className="px-2 py-2"><input type="text" value={row.remarks || ''} onChange={(e) => handleGridRowChange('PBG', index, 'remarks', e.target.value)} className="w-32 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2 text-center border-r border-gray-200">
+                              <button onClick={() => window.open(`/dashboard/performance_guarantee/${row.id}`, '_blank')} className="text-blue-600 hover:text-blue-800 font-medium text-xs hover:underline">Edit Page</button>
+                            </td>
+                            <td className="px-2 py-2 border-l-2 border-gray-100"><input type="text" value={row.cg_ref_number || ''} disabled className="w-20 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100" /></td>
+                            <td className="px-2 py-2"><input type="date" value={row.cg_date || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('PBG', index, 'cg_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="text" value={row.cg_bank || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('PBG', index, 'cg_bank', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="date" value={row.cg_expiry_date || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('PBG', index, 'cg_expiry_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2">{row.cg_id ? renderGridStatusDropdown(row.cg_status, (v) => handleGridRowChange('PBG', index, 'cg_status', v)) : <span className="text-gray-400 text-xs italic">N/A</span>}</td>
+                            <td className="px-2 py-2"><input type="text" value={row.cg_remarks || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('PBG', index, 'cg_remarks', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2 text-center border-l border-gray-200">
+                              {row.cg_id ? (
+                                <button onClick={() => window.open(`/dashboard/counter_guarantee/${row.cg_id}`, '_blank')} className="text-blue-600 hover:text-blue-800 font-medium text-xs hover:underline">Edit CG</button>
+                              ) : (
+                                <button onClick={() => window.open(`/dashboard/counter_guarantee/create`, '_blank')} className="text-green-600 hover:text-green-800 font-medium text-xs hover:underline">Create CG</button>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex justify-end mt-4">
+                    <button onClick={() => saveGridGuarantees('PBG')} disabled={saving} className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-2">
+                      {saving ? 'Saving...' : 'Save All PBG Guarantees'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
           {/* MPG Grid */}
           <div className="bg-white rounded-lg shadow p-4">
             <div className="mb-6">
@@ -709,14 +816,14 @@ export default function GuaranteesDashboard() {
                             <td className="px-2 py-2 text-gray-700 font-medium whitespace-nowrap">{row.ref_doc_no}</td>
                             <td className="px-2 py-2"><input type="text" value={row.guarantee_no || ''} onChange={(e) => handleGridRowChange('MPG', index, 'guarantee_no', e.target.value)} className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><select value={row.participated} onChange={(e) => handleGridRowChange('MPG', index, 'participated', Number(e.target.value))} className="w-16 px-2 py-1 text-xs border border-gray-300 rounded"><option value="0">No</option><option value="1">Yes</option></select></td>
-                            <td className="px-2 py-2"><select value={row.bank_or_deposit} onChange={(e) => handleGridRowChange('MPG', index, 'bank_or_deposit', Number(e.target.value))} className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"><option value="0">Bank</option><option value="1">Deposit</option></select></td>
-                            <td className="px-2 py-2"><input type="text" value={row.bank_or_deposit === 0 ? row.issuing_bank : row.deposit_receipt_no} onChange={(e) => handleGridRowChange('MPG', index, row.bank_or_deposit === 0 ? 'issuing_bank' : 'deposit_receipt_no', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><select value={row.mpg_bank_or_deposit} onChange={(e) => handleGridRowChange('MPG', index, 'mpg_bank_or_deposit', Number(e.target.value))} className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"><option value="0">Bank</option><option value="1">Deposit</option></select></td>
+                            <td className="px-2 py-2"><input type="text" value={row.mpg_bank_or_deposit === 0 ? row.mpg_issuing_bank : row.mpg_deposit_receipt_no} onChange={(e) => handleGridRowChange('MPG', index, row.mpg_bank_or_deposit === 0 ? 'mpg_issuing_bank' : 'mpg_deposit_receipt_no', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="text" value={formatNumber(row.guarantee_value || '')} onChange={(e) => handleGridRowChange('MPG', index, 'guarantee_value', formatNumber(e.target.value))} className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.expiry_date || ''} onChange={(e) => handleGridRowChange('MPG', index, 'expiry_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="date" value={row.submitted_date || ''} onChange={(e) => handleGridRowChange('MPG', index, 'submitted_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="date" value={row.release_date_dewa || ''} onChange={(e) => handleGridRowChange('MPG', index, 'release_date_dewa', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="date" value={row.release_date_bank || ''} onChange={(e) => handleGridRowChange('MPG', index, 'release_date_bank', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="text" value={row.extension_dates || ''} onChange={(e) => handleGridRowChange('MPG', index, 'extension_dates', e.target.value)} placeholder="YYYY-MM-DD, ..." className="w-32 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="date" value={row.mpg_submitted_date || ''} onChange={(e) => handleGridRowChange('MPG', index, 'mpg_submitted_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="date" value={row.mpg_release_date_dewa || ''} onChange={(e) => handleGridRowChange('MPG', index, 'mpg_release_date_dewa', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="date" value={row.mpg_release_date_bank || ''} onChange={(e) => handleGridRowChange('MPG', index, 'mpg_release_date_bank', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="text" value={row.mpg_extension_dates || ''} onChange={(e) => handleGridRowChange('MPG', index, 'mpg_extension_dates', e.target.value)} placeholder="YYYY-MM-DD, ..." className="w-32 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2">{renderGridStatusDropdown(row.status || 'NOT Issued', (val) => handleGridRowChange('MPG', index, 'status', val))}</td>
                             <td className="px-2 py-2"><input type="text" value={row.remarks || ''} onChange={(e) => handleGridRowChange('MPG', index, 'remarks', e.target.value)} className="w-32 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2 text-center border-r border-gray-200">
@@ -750,88 +857,7 @@ export default function GuaranteesDashboard() {
             </div>
           </div>
 
-          {/* PBG Grid */}
-          <div className="bg-white rounded-lg shadow p-4">
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-md font-semibold text-purple-700">Performance Bond Guarantees (PBG)</h3>
-                <button onClick={() => toggleSection("pbg")} className="text-xs px-2 py-1 border rounded hover:bg-gray-100">
-                  {collapsedSections.pbg ? "Expand" : "Minimise"}
-                </button>
-              </div>
-              {!collapsedSections.pbg && (
-                <>
-                  <div className="overflow-x-auto border border-gray-200 rounded-md">
-                    <table className="min-w-full divide-y divide-gray-200 text-sm">
-                      <thead className="bg-purple-50">
-                        <tr>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">PO No</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Guarantee No</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Type</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Bank / Receipt No</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Value</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">PBG Date</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Expiry Date</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">DEWA Release</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Bank Release</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Extension Dates</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Pending Status</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Remarks</th>
-                          <th className="px-2 py-2 text-center text-xs font-bold text-blue-700 uppercase border-r border-purple-200">Edit Page</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase border-l-2 border-gray-300">CG Ref</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">CG Date</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">CG Bank</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">CG Expiry</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">CG Status</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">CG Remarks</th>
-                          <th className="px-2 py-2 text-center text-xs font-bold text-blue-700 uppercase border-l border-purple-200">CG Action</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {filteredPbgRows.map((row, index) => (
-                          <tr key={row.id} className="hover:bg-gray-50">
-                            <td className="px-2 py-2 text-gray-700 font-medium whitespace-nowrap">{row.ref_doc_no}</td>
-                            <td className="px-2 py-2"><input type="text" value={row.guarantee_no || ''} onChange={(e) => handleGridRowChange('PBG', index, 'guarantee_no', e.target.value)} className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><select value={row.bank_or_deposit} onChange={(e) => handleGridRowChange('PBG', index, 'bank_or_deposit', Number(e.target.value))} className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"><option value="0">Bank</option><option value="1">Deposit</option></select></td>
-                            <td className="px-2 py-2"><input type="text" value={row.bank_or_deposit === 0 ? row.issuing_bank : row.deposit_receipt_no} onChange={(e) => handleGridRowChange('PBG', index, row.bank_or_deposit === 0 ? 'issuing_bank' : 'deposit_receipt_no', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="text" value={formatNumber(row.guarantee_value || '')} onChange={(e) => handleGridRowChange('PBG', index, 'guarantee_value', formatNumber(e.target.value))} className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="date" value={row.submitted_date || ''} onChange={(e) => handleGridRowChange('PBG', index, 'submitted_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="date" value={row.expiry_date || ''} onChange={(e) => handleGridRowChange('PBG', index, 'expiry_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="date" value={row.release_date_dewa || ''} onChange={(e) => handleGridRowChange('PBG', index, 'release_date_dewa', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="date" value={row.release_date_bank || ''} onChange={(e) => handleGridRowChange('PBG', index, 'release_date_bank', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="text" value={row.extension_dates || ''} onChange={(e) => handleGridRowChange('PBG', index, 'extension_dates', e.target.value)} placeholder="YYYY-MM-DD, ..." className="w-32 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2">{renderGridStatusDropdown(row.status || 'NOT Issued', (val) => handleGridRowChange('PBG', index, 'status', val))}</td>
-                            <td className="px-2 py-2"><input type="text" value={row.remarks || ''} onChange={(e) => handleGridRowChange('PBG', index, 'remarks', e.target.value)} className="w-32 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2 text-center border-r border-gray-200">
-                              <button onClick={() => window.open(`/dashboard/performance_guarantee/${row.id}`, '_blank')} className="text-blue-600 hover:text-blue-800 font-medium text-xs hover:underline">Edit Page</button>
-                            </td>
-                            <td className="px-2 py-2 border-l-2 border-gray-100"><input type="text" value={row.cg_ref_number || ''} disabled className="w-20 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100" /></td>
-                            <td className="px-2 py-2"><input type="date" value={row.cg_date || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('PBG', index, 'cg_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="text" value={row.cg_bank || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('PBG', index, 'cg_bank', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="date" value={row.cg_expiry_date || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('PBG', index, 'cg_expiry_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2">{row.cg_id ? renderGridStatusDropdown(row.cg_status, (v) => handleGridRowChange('PBG', index, 'cg_status', v)) : <span className="text-gray-400 text-xs italic">N/A</span>}</td>
-                            <td className="px-2 py-2"><input type="text" value={row.cg_remarks || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('PBG', index, 'cg_remarks', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2 text-center border-l border-gray-200">
-                              {row.cg_id ? (
-                                <button onClick={() => window.open(`/dashboard/counter_guarantee/${row.cg_id}`, '_blank')} className="text-blue-600 hover:text-blue-800 font-medium text-xs hover:underline">Edit CG</button>
-                              ) : (
-                                <button onClick={() => window.open(`/dashboard/counter_guarantee/create`, '_blank')} className="text-green-600 hover:text-green-800 font-medium text-xs hover:underline">Create CG</button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  <div className="flex justify-end mt-4">
-                    <button onClick={() => saveGridGuarantees('PBG')} disabled={saving} className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-2">
-                      {saving ? 'Saving...' : 'Save All PBG Guarantees'}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+          
         </div>
 
       ) : (
@@ -1008,6 +1034,149 @@ export default function GuaranteesDashboard() {
                 </div>
               )}
 
+              {/* PBG Form */}
+              {formPbg ? (
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                  <div className="flex justify-between items-center mb-6 pb-2 border-b">
+                    <div className="flex items-center gap-3">
+                      <h2 className="text-xl font-bold text-purple-800">Performance Bond Guarantee (PBG) Form</h2>
+                      <span className="text-sm font-medium text-gray-500 px-3 py-1 bg-gray-100 rounded">{formPbg.ref_doc_no}</span>
+                    </div>
+                    <button onClick={() => toggleFormSection('pbg')} className="text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-gray-700 font-medium transition">
+                      {formCollapsed.pbg ? "Expand" : "Minimise"}
+                    </button>
+                  </div>
+
+                  {!formCollapsed.pbg && (
+                    <>
+                      <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">PBG Details</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                          <select value={formPbg.bank_or_deposit} onChange={(e) => handleFormChange('PBG', 'bank_or_deposit', Number(e.target.value))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"><option value="0">Bank</option><option value="1">Deposit</option></select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Guarantee No</label>
+                          <input type="text" value={formPbg.guarantee_no || ''} onChange={(e) => handleFormChange('PBG', 'guarantee_no', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">{formPbg.bank_or_deposit === 0 ? 'Issuing Bank' : 'Receipt No'}</label>
+                          <input type="text" value={formPbg.bank_or_deposit === 0 ? formPbg.issuing_bank : formPbg.deposit_receipt_no} onChange={(e) => handleFormChange('PBG', formPbg.bank_or_deposit === 0 ? 'issuing_bank' : 'deposit_receipt_no', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Value</label>
+                          <input type="text" value={formatNumber(formPbg.guarantee_value || '')} onChange={(e) => handleFormChange('PBG', 'guarantee_value', formatNumber(e.target.value))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Expiry Date</label>
+                          <input type="date" value={formPbg.expiry_date || ''} onChange={(e) => handleFormChange('PBG', 'expiry_date', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Submitted Date</label>
+                          <input type="date" value={formPbg.submitted_date || ''} onChange={(e) => handleFormChange('PBG', 'submitted_date', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">DEWA Release</label>
+                          <input type="date" value={formPbg.release_date_dewa || ''} onChange={(e) => handleFormChange('PBG', 'release_date_dewa', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Bank Release</label>
+                          <input type="date" value={formPbg.release_date_bank || ''} onChange={(e) => handleFormChange('PBG', 'release_date_bank', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                          {renderStatusDropdown(formPbg.status, (val) => handleFormChange('PBG', 'status', val))}
+                        </div>
+                        <div className="lg:col-span-3">
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Remarks</label>
+                          <input type="text" value={formPbg.remarks || ''} onChange={(e) => handleFormChange('PBG', 'remarks', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                        </div>
+                      </div>
+
+                      <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Extension Dates</h3>
+                      <div className="flex gap-2 mb-3 max-w-sm">
+                        <input type="date" value={extDates.PBG} onChange={(e) => setExtDates({...extDates, PBG: e.target.value})} className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                        <button type="button" onClick={() => addFormExtensionDate('PBG')} className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm font-medium">+ Add</button>
+                      </div>
+                      {formPbg.extension_dates_array && formPbg.extension_dates_array.length > 0 && (
+                        <div className="border border-gray-200 rounded-md overflow-hidden max-w-md mb-6">
+                          <table className="min-w-full divide-y divide-gray-200 text-sm">
+                            <thead className="bg-gray-50">
+                              <tr><th className="px-3 py-2 text-left font-medium text-gray-500">Date</th><th className="px-3 py-2 text-right font-medium text-gray-500">Action</th></tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {formPbg.extension_dates_array.map((date: string, idx: number) => (
+                                <tr key={idx}><td className="px-3 py-2">{date}</td><td className="px-3 py-2 text-right"><button onClick={() => removeFormExtensionDate('PBG', idx)} className="text-red-600 hover:text-red-800 text-xs">Remove</button></td></tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+
+                      {/* Section 3: CG */}
+                      <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-6">
+                        <div className="flex justify-between items-center mb-3">
+                          <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Counter Guarantee Details</h3>
+                          {!formPbg.cg_id && (
+                            <button onClick={() => activateInlineCG('PBG')} className="text-xs px-3 py-1 bg-green-100 text-green-700 font-semibold rounded hover:bg-green-200 transition">
+                              + Add Counter Guarantee
+                            </button>
+                          )}
+                        </div>
+                        
+                        {formPbg.cg_id ? (
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">CG Ref Number</label>
+                              <input type="text" value={formPbg.cg_ref_number || ''} disabled className="w-full px-3 py-2 text-sm border border-gray-300 rounded bg-gray-100" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">CG Date</label>
+                              <input type="date" value={formPbg.cg_date || ''} onChange={(e) => handleFormChange('PBG', 'cg_date', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">CG Bank</label>
+                              <input type="text" value={formPbg.cg_bank || ''} onChange={(e) => handleFormChange('PBG', 'cg_bank', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">CG Expiry Date</label>
+                              <input type="date" value={formPbg.cg_expiry_date || ''} onChange={(e) => handleFormChange('PBG', 'cg_expiry_date', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-medium text-gray-700 mb-1">CG Status</label>
+                              {renderStatusDropdown(formPbg.cg_status, (val) => handleFormChange('PBG', 'cg_status', val))}
+                            </div>
+                            <div className="md:col-span-3">
+                              <label className="block text-xs font-medium text-gray-700 mb-1">CG Remarks</label>
+                              <input type="text" value={formPbg.cg_remarks || ''} onChange={(e) => handleFormChange('PBG', 'cg_remarks', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-500 italic">No Counter Guarantee attached.</p>
+                        )}
+                      </div>
+
+                      <div className="flex justify-end items-center gap-4 pt-4 border-t border-gray-200">
+                        <button onClick={() => openEditTabs('PBG', formPbg.id, formPbg.cg_id, formPbg.isNewCG)} className="text-purple-600 hover:text-purple-800 font-semibold text-sm hover:underline">
+                          Open Edit Pages (Tabs)
+                        </button>
+                        <button onClick={() => saveSingleForm('PBG')} disabled={saving} className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition disabled:opacity-50">
+                          Save This Guarantee
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : selectedOrderId !== '' && (
+                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center shadow-sm">
+                  <h3 className="text-lg font-semibold text-gray-700 mb-2">No Performance Bond Guarantee</h3>
+                  <p className="text-sm text-gray-500 mb-4">There is no PBG associated with this PO.</p>
+                  <button onClick={() => window.open('/dashboard/performance_guarantee/create', '_blank')} className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition font-medium text-sm">
+                    + Create PBG
+                  </button>
+                </div>
+              )}
+
               {/* MPG Form */}
               {formMpg ? (
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -1154,149 +1323,7 @@ export default function GuaranteesDashboard() {
                   </button>
                 </div>
               )}
-
-              {/* PBG Form */}
-              {formPbg ? (
-                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                  <div className="flex justify-between items-center mb-6 pb-2 border-b">
-                    <div className="flex items-center gap-3">
-                      <h2 className="text-xl font-bold text-purple-800">Performance Bond Guarantee (PBG) Form</h2>
-                      <span className="text-sm font-medium text-gray-500 px-3 py-1 bg-gray-100 rounded">{formPbg.ref_doc_no}</span>
-                    </div>
-                    <button onClick={() => toggleFormSection('pbg')} className="text-xs px-3 py-1 border border-gray-300 rounded hover:bg-gray-100 text-gray-700 font-medium transition">
-                      {formCollapsed.pbg ? "Expand" : "Minimise"}
-                    </button>
-                  </div>
-
-                  {!formCollapsed.pbg && (
-                    <>
-                      <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">PBG Details</h3>
-                      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
-                          <select value={formPbg.bank_or_deposit} onChange={(e) => handleFormChange('PBG', 'bank_or_deposit', Number(e.target.value))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"><option value="0">Bank</option><option value="1">Deposit</option></select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Guarantee No</label>
-                          <input type="text" value={formPbg.guarantee_no || ''} onChange={(e) => handleFormChange('PBG', 'guarantee_no', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">{formPbg.bank_or_deposit === 0 ? 'Issuing Bank' : 'Receipt No'}</label>
-                          <input type="text" value={formPbg.bank_or_deposit === 0 ? formPbg.issuing_bank : formPbg.deposit_receipt_no} onChange={(e) => handleFormChange('PBG', formPbg.bank_or_deposit === 0 ? 'issuing_bank' : 'deposit_receipt_no', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Value</label>
-                          <input type="text" value={formatNumber(formPbg.guarantee_value || '')} onChange={(e) => handleFormChange('PBG', 'guarantee_value', formatNumber(e.target.value))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Expiry Date</label>
-                          <input type="date" value={formPbg.expiry_date || ''} onChange={(e) => handleFormChange('PBG', 'expiry_date', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Submitted Date</label>
-                          <input type="date" value={formPbg.submitted_date || ''} onChange={(e) => handleFormChange('PBG', 'submitted_date', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">DEWA Release</label>
-                          <input type="date" value={formPbg.release_date_dewa || ''} onChange={(e) => handleFormChange('PBG', 'release_date_dewa', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Bank Release</label>
-                          <input type="date" value={formPbg.release_date_bank || ''} onChange={(e) => handleFormChange('PBG', 'release_date_bank', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Status</label>
-                          {renderStatusDropdown(formPbg.status, (val) => handleFormChange('PBG', 'status', val))}
-                        </div>
-                        <div className="lg:col-span-3">
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Remarks</label>
-                          <input type="text" value={formPbg.remarks || ''} onChange={(e) => handleFormChange('PBG', 'remarks', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
-                        </div>
-                      </div>
-
-                      <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">Extension Dates</h3>
-                      <div className="flex gap-2 mb-3 max-w-sm">
-                        <input type="date" value={extDates.PBG} onChange={(e) => setExtDates({...extDates, PBG: e.target.value})} className="flex-1 px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
-                        <button type="button" onClick={() => addFormExtensionDate('PBG')} className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 text-sm font-medium">+ Add</button>
-                      </div>
-                      {formPbg.extension_dates_array && formPbg.extension_dates_array.length > 0 && (
-                        <div className="border border-gray-200 rounded-md overflow-hidden max-w-md mb-6">
-                          <table className="min-w-full divide-y divide-gray-200 text-sm">
-                            <thead className="bg-gray-50">
-                              <tr><th className="px-3 py-2 text-left font-medium text-gray-500">Date</th><th className="px-3 py-2 text-right font-medium text-gray-500">Action</th></tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {formPbg.extension_dates_array.map((date: string, idx: number) => (
-                                <tr key={idx}><td className="px-3 py-2">{date}</td><td className="px-3 py-2 text-right"><button onClick={() => removeFormExtensionDate('PBG', idx)} className="text-red-600 hover:text-red-800 text-xs">Remove</button></td></tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      )}
-
-                      {/* Section 3: CG */}
-                      <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-6">
-                        <div className="flex justify-between items-center mb-3">
-                          <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Counter Guarantee Details</h3>
-                          {!formPbg.cg_id && (
-                            <button onClick={() => activateInlineCG('PBG')} className="text-xs px-3 py-1 bg-green-100 text-green-700 font-semibold rounded hover:bg-green-200 transition">
-                              + Add Counter Guarantee
-                            </button>
-                          )}
-                        </div>
-                        
-                        {formPbg.cg_id ? (
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">CG Ref Number</label>
-                              <input type="text" value={formPbg.cg_ref_number || ''} disabled className="w-full px-3 py-2 text-sm border border-gray-300 rounded bg-gray-100" />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">CG Date</label>
-                              <input type="date" value={formPbg.cg_date || ''} onChange={(e) => handleFormChange('PBG', 'cg_date', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">CG Bank</label>
-                              <input type="text" value={formPbg.cg_bank || ''} onChange={(e) => handleFormChange('PBG', 'cg_bank', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">CG Expiry Date</label>
-                              <input type="date" value={formPbg.cg_expiry_date || ''} onChange={(e) => handleFormChange('PBG', 'cg_expiry_date', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">CG Status</label>
-                              {renderStatusDropdown(formPbg.cg_status, (val) => handleFormChange('PBG', 'cg_status', val))}
-                            </div>
-                            <div className="md:col-span-3">
-                              <label className="block text-xs font-medium text-gray-700 mb-1">CG Remarks</label>
-                              <input type="text" value={formPbg.cg_remarks || ''} onChange={(e) => handleFormChange('PBG', 'cg_remarks', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
-                            </div>
-                          </div>
-                        ) : (
-                          <p className="text-sm text-gray-500 italic">No Counter Guarantee attached.</p>
-                        )}
-                      </div>
-
-                      <div className="flex justify-end items-center gap-4 pt-4 border-t border-gray-200">
-                        <button onClick={() => openEditTabs('PBG', formPbg.id, formPbg.cg_id, formPbg.isNewCG)} className="text-purple-600 hover:text-purple-800 font-semibold text-sm hover:underline">
-                          Open Edit Pages (Tabs)
-                        </button>
-                        <button onClick={() => saveSingleForm('PBG')} disabled={saving} className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition disabled:opacity-50">
-                          Save This Guarantee
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              ) : selectedOrderId !== '' && (
-                <div className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-lg p-8 text-center shadow-sm">
-                  <h3 className="text-lg font-semibold text-gray-700 mb-2">No Performance Bond Guarantee</h3>
-                  <p className="text-sm text-gray-500 mb-4">There is no PBG associated with this PO.</p>
-                  <button onClick={() => window.open('/dashboard/performance_guarantee/create', '_blank')} className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition font-medium text-sm">
-                    + Create PBG
-                  </button>
-                </div>
-              )}
+              
 
               {/* Master Save Button */}
               {(formTbg || formMpg || formPbg) && (

@@ -61,7 +61,13 @@ export default function CreateTCIPage() {
   return (
     <div className="max-w-lg p-8">
       <h1 className="text-2xl font-bold mb-6">Create Tender Company Item</h1>
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+      e.preventDefault()
+    }
+  }}
+  onSubmit={handleSubmit} className="space-y-6">
         {error && <p className="text-red-600">{error}</p>}
 
         <div>

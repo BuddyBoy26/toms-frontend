@@ -6,6 +6,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Loader from '@/components/Loader'
 import OrderItemsTable from '@/components/OrderItemsTable'
 import { generatePDF } from '@/utils/pdfGenerator'
+import { triggerReminders } from '@/utils/reminderTrigger'
 
 type CurrencyEnum = 'AED' | 'EUR' | 'USD'
 
@@ -16,7 +17,7 @@ interface OrderDetail {
   po_number: string
   order_description: string
   order_date: string
-  po_commencement_date: string | null
+  po_commencemnt_date: string | null
   order_value: number
   currency: CurrencyEnum
   order_value_aed: number
@@ -136,7 +137,7 @@ export default function OrderDetailEditPage() {
     tender_id: '' as number | '',
     po_number: '',
     order_date: '',
-    po_commencement_date: '',
+    po_commencemnt_date: '',
     order_value: '',
     currency: 'AED' as CurrencyEnum,
     order_value_aed: '',
@@ -227,7 +228,7 @@ export default function OrderDetailEditPage() {
         tender_id: orderData.tender_id,
         po_number: orderData.po_number,
         order_date: orderData.order_date,
-        po_commencement_date: orderData.po_commencement_date || '',
+        po_commencemnt_date: orderData.po_commencemnt_date || '',
         order_value: formatNumber(orderData.order_value),
         currency: orderData.currency,
         order_value_aed: formatNumber(orderData.order_value_aed),
@@ -344,7 +345,7 @@ export default function OrderDetailEditPage() {
     setFormData({
       ...formData,
       order_date: date,
-      po_commencement_date: date,
+      po_commencemnt_date: date,
     })
   }
 
@@ -365,7 +366,7 @@ export default function OrderDetailEditPage() {
       po_number: formData.po_number,
       order_description: orderDescription,
       order_date: formData.order_date,
-      po_commencement_date: formData.po_commencement_date || null,
+      po_commencemnt_date: formData.po_commencemnt_date || null,
       order_value: parseFormattedNumber(formData.order_value),
       currency: formData.currency,
       order_value_aed: parseFormattedNumber(formData.order_value_aed),
@@ -400,6 +401,7 @@ export default function OrderDetailEditPage() {
       })
 
       if (response.ok) {
+        triggerReminders('order_details')
         router.push('/dashboard/order_detail')
       } else {
         const err = await response.json().catch(() => null)
@@ -489,7 +491,7 @@ export default function OrderDetailEditPage() {
           ["Tender", tender?.tender_no || 'N/A'],
           ["Order Description", order.order_description],
           ["Order Date", order.order_date || 'N/A'],
-          ["PO Commencement Date", order.po_commencement_date || 'N/A'],
+          ["PO Commencement Date", order.po_commencemnt_date || 'N/A'],
           ["Order Value", `${order.currency} ${formatNumber(order.order_value)}`],
           ["Order Value (AED)", `AED ${formatNumber(order.order_value_aed)}`],
           ["KKA Commission", `${order.kka_commission_percent}%`],
@@ -554,7 +556,13 @@ export default function OrderDetailEditPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+      e.preventDefault()
+    }
+  }}
+  onSubmit={handleSubmit} className="space-y-4">
         {/* Basic Information */}
         <div className="bg-white rounded-lg shadow p-4">
           <h2 className="text-lg font-semibold mb-3 pb-2 border-b">Basic Information</h2>
@@ -615,9 +623,9 @@ export default function OrderDetailEditPage() {
                 </label>
                 <input
                   type="date"
-                  value={formData.po_commencement_date}
+                  value={formData.po_commencemnt_date}
                   onChange={(e) =>
-                    setFormData({ ...formData, po_commencement_date: e.target.value })
+                    setFormData({ ...formData, po_commencemnt_date: e.target.value })
                   }
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-green-500"
                   required

@@ -5,6 +5,8 @@ import { useEffect, useState, useMemo } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Loader from '@/components/Loader'
 import { generatePDF } from '@/utils/pdfGenerator'
+import { triggerReminders } from '@/utils/reminderTrigger'
+ 
 
 type CurrencyEnum = 'AED' | 'EUR' | 'USD'
 
@@ -735,6 +737,7 @@ export default function LotMonitoringEditPage() {
       })
 
       if (response.ok) {
+        triggerReminders('lot_monitoring')
         router.push('/dashboard/lot_monitoring')
       } else {
         const err = await response.json().catch(() => null)
@@ -775,6 +778,7 @@ export default function LotMonitoringEditPage() {
       })
 
       if (response.ok) {
+        triggerReminders('lot_monitoring')
         router.push('/dashboard/lot_monitoring')
       } else {
         const err = await response.json().catch(() => null)
@@ -930,7 +934,13 @@ export default function LotMonitoringEditPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form
+  onKeyDown={(e) => {
+    if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+      e.preventDefault()
+    }
+  }}
+  onSubmit={handleSubmit} className="space-y-4">
         {/* Lot Monitoring Information */}
         <div className="bg-white rounded-lg shadow p-4">
           <h2 className="text-lg font-semibold mb-3 pb-2 border-b">Lot Monitoring Information</h2>
