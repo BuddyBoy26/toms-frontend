@@ -41,6 +41,7 @@ interface DeliveryProcedure {
 interface Lot {
   lot_id: number
   order_id: number
+  shipment_no: string | null
 }
 
 interface OrderDetail {
@@ -70,13 +71,13 @@ const getCDExemptionLabel = (exemption: number | null): string => {
 
 const getCEPADDULabel = (type: number | null): string => {
   if (type === null) return 'N/A'
-  return type === 0 ? 'CEPA' : 'DDU'
+  return type === 0 ? 'DEWA Exemption' : 'CEPA'
 }
 
 type DisplayProcedure = {
   dp_id: number
   po_number: string
-  lot_id: number
+  shipment_no: string
   item_no_dewa: string
   lot_no_dewa: string
   document_status: string
@@ -135,8 +136,8 @@ export default function DeliveryProcedurePage() {
 
   // Build lookup maps
   const lotMap = useMemo(() => {
-    const m = new Map<number, number>() // lot_id → order_id
-    for (const l of lots) m.set(l.lot_id, l.order_id)
+    const m = new Map<number, { order_id: number; shipment_no: string | null }>()
+    for (const l of lots) m.set(l.lot_id, { order_id: l.order_id, shipment_no: l.shipment_no })
     return m
   }, [lots])
 
@@ -148,13 +149,14 @@ export default function DeliveryProcedurePage() {
 
   const formattedRows: DisplayProcedure[] = useMemo(() => {
     return procedures.map(proc => {
-      const orderId = lotMap.get(proc.lot_id)
-      const poNumber = orderId ? (orderMap.get(orderId) ?? '—') : '—'
+      const lotData = lotMap.get(proc.lot_id)
+      const poNumber = lotData ? (orderMap.get(lotData.order_id) ?? '—') : '—'
+      const shipmentNo = lotData?.shipment_no || '—'
 
       return {
         dp_id: proc.dp_id,
         po_number: poNumber,
-        lot_id: proc.lot_id,
+        shipment_no: shipmentNo,
         item_no_dewa: proc.item_no_dewa || 'N/A',
         lot_no_dewa: proc.lot_no_dewa || 'N/A',
         document_status: getDocumentStatusLabel(proc.document_status),
@@ -170,7 +172,7 @@ export default function DeliveryProcedurePage() {
   const columns: Column<DisplayProcedure>[] = [
     { key: 'dp_id', header: 'DP ID' },
     { key: 'po_number', header: 'PO Number' },
-    { key: 'lot_id', header: 'Lot ID' },
+    { key: 'shipment_no', header: 'Shipment No' },
     { key: 'item_no_dewa', header: 'Item No (DEWA)' },
     { key: 'lot_no_dewa', header: 'Lot No (DEWA)' },
     { key: 'document_status', header: 'Document Status' },
