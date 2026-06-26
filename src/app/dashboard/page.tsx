@@ -171,7 +171,7 @@ export default function DashboardHome() {
       })
       if (res.ok) {
         const data: Reminder[] = await res.json()
-        data.sort((a, b) => new Date(a.activation_date).getTime() - new Date(b.activation_date).getTime())
+        data.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
         setReminders(data)
       }
     } catch (err) {

@@ -1,9 +1,9 @@
-// src/app/dashboard/delivery_procedure/page.tsx
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import CustomTable, { Column } from '@/components/CustomTable'
+import Loader from '@/components/Loader'
 
 interface DeliveryProcedure {
   dp_id: number
@@ -38,9 +38,19 @@ interface DeliveryProcedure {
   end_of_delivery_remarks: string | null
 }
 
+interface Lot {
+  lot_id: number
+  order_id: number
+}
+
+interface OrderDetail {
+  order_id: number
+  po_number: string
+}
+
 const formatDate = (dateStr: string | null): string => {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString()
+  return new Date(dateStr).toLocaleDateString('en-GB')
 }
 
 const getDocumentStatusLabel = (status: number | null): string => {
@@ -63,19 +73,35 @@ const getCEPADDULabel = (type: number | null): string => {
   return type === 0 ? 'CEPA' : 'DDU'
 }
 
+type DisplayProcedure = {
+  dp_id: number
+  po_number: string
+  lot_id: number
+  item_no_dewa: string
+  lot_no_dewa: string
+  document_status: string
+  cd_exemption: string
+  cepa_ddu: string
+  asn_no: string
+  delivery_note_no: string
+  delivery_date: string
+}
+
 export default function DeliveryProcedurePage() {
   const router = useRouter()
   const API = process.env.NEXT_PUBLIC_BACKEND_API_URL
 
   const [procedures, setProcedures] = useState<DeliveryProcedure[]>([])
+  const [lots, setLots] = useState<Lot[]>([])
+  const [orders, setOrders] = useState<OrderDetail[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchProcedures()
+    fetchAll()
   }, [])
 
-  const fetchProcedures = async () => {
+  const fetchAll = async () => {
     const token = localStorage.getItem('kkabbas_token')
     if (!token) {
       setError('Not authenticated')
@@ -85,60 +111,65 @@ export default function DeliveryProcedurePage() {
 
     setLoading(true)
     try {
-      const response = await fetch(`${API}/delivery_procedure`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+      const [dpRes, lotsRes, ordersRes] = await Promise.all([
+        fetch(`${API}/delivery_procedure`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/lot_monitoring`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API}/order_detail`, { headers: { Authorization: `Bearer ${token}` } }),
+      ])
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch delivery procedures')
-      }
+      if (!dpRes.ok) throw new Error('Failed to fetch delivery procedures')
 
-      const data = await response.json()
-      setProcedures(Array.isArray(data) ? data : [])
-    } catch (e: any) {
-      setError(e.message || 'Failed to load delivery procedures')
+      const [dpData, lotsData, ordersData] = await Promise.all([
+        dpRes.json(), lotsRes.json(), ordersRes.json()
+      ])
+
+      setProcedures(Array.isArray(dpData) ? dpData : [])
+      setLots(Array.isArray(lotsData) ? lotsData : [])
+      setOrders(Array.isArray(ordersData) ? ordersData : [])
+    } catch (e: unknown) {
+      setError((e as Error)?.message || 'Failed to load delivery procedures')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleDelete = async (id: number) => {
-    if (!window.confirm('Are you sure you want to delete this delivery procedure?')) {
-      return
-    }
+  // Build lookup maps
+  const lotMap = useMemo(() => {
+    const m = new Map<number, number>() // lot_id → order_id
+    for (const l of lots) m.set(l.lot_id, l.order_id)
+    return m
+  }, [lots])
 
-    const token = localStorage.getItem('kkabbas_token')
-    try {
-      const response = await fetch(`${API}/delivery_procedure/${id}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      })
+  const orderMap = useMemo(() => {
+    const m = new Map<number, string>() // order_id → po_number
+    for (const o of orders) m.set(o.order_id, o.po_number)
+    return m
+  }, [orders])
 
-      if (!response.ok) {
-        throw new Error('Failed to delete delivery procedure')
+  const formattedRows: DisplayProcedure[] = useMemo(() => {
+    return procedures.map(proc => {
+      const orderId = lotMap.get(proc.lot_id)
+      const poNumber = orderId ? (orderMap.get(orderId) ?? '—') : '—'
+
+      return {
+        dp_id: proc.dp_id,
+        po_number: poNumber,
+        lot_id: proc.lot_id,
+        item_no_dewa: proc.item_no_dewa || 'N/A',
+        lot_no_dewa: proc.lot_no_dewa || 'N/A',
+        document_status: getDocumentStatusLabel(proc.document_status),
+        cd_exemption: getCDExemptionLabel(proc.cd_exemption),
+        cepa_ddu: getCEPADDULabel(proc.cepa_ddu),
+        asn_no: proc.asn_no || 'N/A',
+        delivery_note_no: proc.delivery_note_no || 'N/A',
+        delivery_date: formatDate(proc.delivery_date),
       }
-
-      await fetchProcedures()
-    } catch (e: any) {
-      setError(e.message || 'Failed to delete')
-    }
-  }
-
-  type DisplayProcedure = {
-    dp_id: number
-    lot_id: number
-    item_no_dewa: string
-    lot_no_dewa: string
-    document_status: string
-    cd_exemption: string
-    cepa_ddu: string
-    asn_no: string
-    delivery_note_no: string
-    delivery_date: string
-  }
+    })
+  }, [procedures, lotMap, orderMap])
 
   const columns: Column<DisplayProcedure>[] = [
     { key: 'dp_id', header: 'DP ID' },
+    { key: 'po_number', header: 'PO Number' },
     { key: 'lot_id', header: 'Lot ID' },
     { key: 'item_no_dewa', header: 'Item No (DEWA)' },
     { key: 'lot_no_dewa', header: 'Lot No (DEWA)' },
@@ -149,19 +180,6 @@ export default function DeliveryProcedurePage() {
     { key: 'delivery_note_no', header: 'Delivery Note No' },
     { key: 'delivery_date', header: 'Delivery Date' },
   ]
-
-  const formattedRows: DisplayProcedure[] = procedures.map(proc => ({
-    dp_id: proc.dp_id,
-    lot_id: proc.lot_id,
-    item_no_dewa: proc.item_no_dewa || 'N/A',
-    lot_no_dewa: proc.lot_no_dewa || 'N/A',
-    document_status: getDocumentStatusLabel(proc.document_status),
-    cd_exemption: getCDExemptionLabel(proc.cd_exemption),
-    cepa_ddu: getCEPADDULabel(proc.cepa_ddu),
-    asn_no: proc.asn_no || 'N/A',
-    delivery_note_no: proc.delivery_note_no || 'N/A',
-    delivery_date: formatDate(proc.delivery_date),
-  }))
 
   return (
     <div className="p-4">
@@ -181,20 +199,16 @@ export default function DeliveryProcedurePage() {
         </div>
       )}
 
-{loading ? (
-  <div className="py-10 text-center text-gray-500">
-    Loading delivery procedures...
-  </div>
-) : (
-  <CustomTable<DisplayProcedure>
-    columns={columns}
-    data={formattedRows}
-    idField="dp_id"
-    linkPrefix="/dashboard/delivery_procedure"
-  />
-)}
-
-
+      {loading ? (
+        <Loader />
+      ) : (
+        <CustomTable<DisplayProcedure>
+          columns={columns}
+          data={formattedRows}
+          idField="dp_id"
+          linkPrefix="/dashboard/delivery_procedure"
+        />
+      )}
     </div>
   )
 }
