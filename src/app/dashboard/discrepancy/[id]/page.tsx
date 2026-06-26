@@ -49,10 +49,13 @@ export default function DiscrepancyEditPage() {
       .then(res => res.json())
       .then(async (discData) => {
         const ordersRes = await fetch(`${API}/order_detail`, { headers: { Authorization: `Bearer ${token}` } })
+        const ordersData = await ordersRes.json()
+setOrders(Array.isArray(ordersData) ? ordersData : [])
         setOrders(await ordersRes.json())
 
         const lotsRes = await fetch(`${API}/lot_monitoring`, { headers: { Authorization: `Bearer ${token}` } })
-        const lots = await lotsRes.json()
+const lotsRaw = await lotsRes.json()
+const lots = Array.isArray(lotsRaw) ? lotsRaw : []
         const currentLot = lots.find((l: any) => l.lot_id === discData.lot_id)
         const currentOrderId = currentLot?.order_id || ''
 

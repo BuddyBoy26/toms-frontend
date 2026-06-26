@@ -1146,7 +1146,7 @@ export default function TenderingCompanyEditPage() {
         </div>
 
         {/* Real Counter Guarantee Details */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4">
+        {/* <div className="bg-white rounded-lg border border-gray-200 p-4">
           <h2 className="text-lg font-semibold mb-3">Counter Guarantee Details</h2>
           <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -1208,7 +1208,7 @@ export default function TenderingCompanyEditPage() {
               />
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Tender Company Items */}
         <div className="bg-white rounded-lg border border-gray-200 p-4">

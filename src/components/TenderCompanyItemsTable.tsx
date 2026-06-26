@@ -365,21 +365,20 @@ export default function TenderCompanyItemsTable({
         console.log('Saving item with values:', item)
 
         const payload = {
-          tendering_companies_id: tenderingCompanyId,
-          item_id: Number(item.item_id),
-          item_description: item.item_description,
-          item_no_dewa: item.item_no_dewa,
-          item_price: parseFormattedNumber(item.item_price).toFixed(4),
-          item_quantity: parseFormattedNumber(item.item_quantity).toFixed(4),
-          item_total_value: parseFormattedNumber(item.item_total_value).toFixed(4),
-          forex_rate: parseFormattedNumber(item.forex_rate).toFixed(4),
-          value_aed: parseFormattedNumber(item.value_aed).toFixed(4),
-          currency: item.currency,
-          discount_percent: parseFormattedNumber(item.discount_percent).toFixed(4) || 0,
-          discount_amount: parseFormattedNumber(item.discount_amount).toFixed(4) || 0,
-          discount_value: parseFormattedNumber(item.discount_value).toFixed(4),
-          value_aed_after_discount: parseFormattedNumber(item.value_aed_after_discount).toFixed(4),
-        }
+  tendering_companies_id: tenderingCompanyId,
+  item_id: Number(item.item_id),
+  item_no_dewa: item.item_no_dewa,
+  item_price: parseFormattedNumber(item.item_price).toFixed(2),
+  item_quantity: parseFormattedNumber(item.item_quantity).toFixed(2),
+  item_total_value: parseFormattedNumber(item.item_total_value).toFixed(2),
+  forex_rate: parseFormattedNumber(item.forex_rate).toFixed(2),
+  value_aed: parseFormattedNumber(item.value_aed).toFixed(2),
+  currency: item.currency,
+  discount_percent: parseFormattedNumber(item.discount_percent).toFixed(2) || 0,
+  discount_amount: parseFormattedNumber(item.discount_amount).toFixed(2) || 0,
+  discount_value: parseFormattedNumber(item.discount_value).toFixed(2),
+  value_aed_after_discount: parseFormattedNumber(item.value_aed_after_discount).toFixed(2),
+}
 
         console.log('Payload to save:', payload)
 

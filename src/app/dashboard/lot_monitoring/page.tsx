@@ -15,8 +15,8 @@ interface OrderDetail {
   po_number: string
   order_description: string
   kka_commission_percent: number
+  order_date: string
 }
-
 interface OrderItemDetail {
   order_item_detail_id: number
   order_id: number
@@ -41,6 +41,7 @@ interface LotMonitoring {
   currency: CurrencyEnum
   quantity: number
   item_total_value: number
+  weeks: number | null
   contractual_delivery_date: string | null
 
   // Inspection - Before
@@ -314,6 +315,7 @@ export default function LotMonitoringPage() {
       currency: orderItem.currency,
       quantity: 0,
       item_total_value: 0,
+      weeks: null,
       contractual_delivery_date: null,
       inspection_call_date_tent: null,
       inspection_call_date_act: null,
@@ -400,12 +402,26 @@ export default function LotMonitoringPage() {
 
     console.log('Updated Lot:', updatedLots[lotIndex])
 
+    if (field === 'weeks') {
+  const selectedOrder = orders.find(o => o.order_id === updatedLots[lotIndex].order_id)
+  if (selectedOrder?.order_date && value) {
+    const orderDate = new Date(selectedOrder.order_date)
+    orderDate.setDate(orderDate.getDate() + (Number(value) * 7))
+    const cdd = orderDate.toISOString().split('T')[0]
+    updatedLots[lotIndex].contractual_delivery_date = cdd
+    // Also recalculate inspection_call_date_tent
+    const d = new Date(cdd)
+    d.setDate(d.getDate() - 60)
+    updatedLots[lotIndex].inspection_call_date_tent = d.toISOString().split('T')[0]
+  }
+}
+
     // Inspection call date calculation
 if (field === 'contractual_delivery_date') {
   const cdd = updatedLots[lotIndex].contractual_delivery_date;
   if (cdd) {
     const d = new Date(cdd);
-    d.setDate(d.getDate() - 60);
+    d.setDate(d.getDate() - 75);
     updatedLots[lotIndex].inspection_call_date_tent = d.toISOString().split('T')[0];
   }
 }
@@ -622,84 +638,95 @@ if (field === "actual_delivery_date" || field === "payment_received_date") {
     const lots = lotMonitoringData.get(orderItemDetailId) || []
     if (lots.length === 0) return
 
+    const toDecimal = (val: number | string | null | undefined, places = 4): string | null => {
+  if (val === null || val === undefined || val === '') return null
+  const num = typeof val === 'string' ? parseFloat(val.replace(/,/g, '')) : val
+  if (isNaN(num)) return null
+  return num.toFixed(places)
+}
+
     for (const lot of lots) {
       const isNewLot = lot.lot_id >= Date.now() - 1000000
 
-      const payload = {
-        order_item_detail_id: lot.order_item_detail_id,
-        order_id: lot.order_id,
-        order_description: lot.order_description,
-        shipment_no: lot.shipment_no,
-        item_lot_no: lot.item_lot_no,
-        item_unit_price: lot.item_unit_price,
-        currency: lot.currency,
-        quantity: lot.quantity,
-        item_total_value: lot.item_total_value,
-        contractual_delivery_date: lot.contractual_delivery_date,
-        inspection_call_date_tent: lot.inspection_call_date_tent,
-        inspection_call_date_act: lot.inspection_call_date_act,
-        inspection_date_advised: lot.inspection_date_advised,
-        no_of_inspection_days: lot.no_of_inspection_days,
-        inspection_at: lot.inspection_at,
-        actual_inspection_date: lot.actual_inspection_date,
-        units_inspected: lot.units_inspected,
-        after_inspection_pending_quantity: lot.after_inspection_pending_quantity,
-        after_inspection_pending_lot_id: lot.after_inspection_pending_lot_id,
-        mom_date: lot.mom_date,
-        dispatch_clearance_date: lot.dispatch_clearance_date,
-        inspection_delay_days: lot.inspection_delay_days,
-        dispatch_clearance_delay: lot.dispatch_clearance_delay,
-        etd_date: lot.etd_date,
-        actual_dispatch_date: lot.actual_dispatch_date,
-        eta_date: lot.eta_date,
-        actual_arrival_date: lot.actual_arrival_date,
-        requested_delivery_date: lot.requested_delivery_date,
-        customs_duty_exemption_date: lot.customs_duty_exemption_date,
-        asn_date: lot.asn_date,
-        actual_delivery_date: lot.actual_delivery_date,
-        meter_delivery_date: lot.meter_delivery_date,
-        delivery_note_no: lot.delivery_note_no,
-        delivered_quantity: lot.delivered_quantity,
-        pending_quantity: lot.pending_quantity,
-        remarks_on_delivery: lot.remarks_on_delivery,
-        delivery_total_value: lot.delivery_total_value,
-        grn_no: lot.grn_no,
-        pending_lot_id: lot.pending_lot_id,
-        main_units_delay_days: lot.main_units_delay_days,
-        accessories_delay_days: lot.accessories_delay_days,
-        delay_by_dewa: lot.delay_by_dewa,
-        other_delay_by_dewa: lot.other_delay_by_dewa,
-        reason_for_other_delay: lot.reason_for_other_delay,
-        contractual_payment_date: lot.contractual_payment_date,
-        invoice_no: lot.invoice_no,
-        invoice_date: lot.invoice_date,
-        invoice_value: lot.invoice_value,
-        srm_invoice_no: lot.srm_invoice_no,
-        srm_invoice_date: lot.srm_invoice_date,
-        srm_invoice_value: lot.srm_invoice_value,
-        payment_amount_received: lot.payment_amount_received,
-        payment_received_date: lot.payment_received_date,
-        delay_in_payment_days: lot.delay_in_payment_days,
-        reason_for_payment_delay: lot.reason_for_payment_delay,
-        commission_amount_for_lot: lot.commission_amount_for_lot,
-        commission_amount_for_delivered_quantity: lot.commission_amount_for_delivered_quantity,
-        commission_invoice_no: lot.commission_invoice_no,
-        commission_invoice_date: lot.commission_invoice_date,
-        commission_recieved_date: lot.commission_recieved_date,
-        commission_amount_invoiced: lot.commission_amount_invoiced,
-        balance_commission_amount: lot.balance_commission_amount,
-        ld_delay_units_or_meters: lot.ld_delay_units_or_meters,
-        ld_delay_units: lot.ld_delay_units,
-        ld_delay_meters: lot.ld_delay_meters,
-        delay_dewa_authorisation_days: lot.delay_dewa_authorisation_days,
-        remarks_delay: lot.remarks_delay,
-        force_majeure: lot.force_majeure,
-        force_majeure_days: lot.force_majeure_days,
-        actual_delay_for_ld: lot.actual_delay_for_ld,
-        actual_ld_amount: lot.actual_ld_amount,
-        max_ld_amount: lot.max_ld_amount,
-        chargeable_ld_amount: lot.chargeable_ld_amount,
-      }
+      // Add this helper above the payload
+
+
+const payload = {
+  order_item_detail_id: lot.order_item_detail_id,
+  order_id: lot.order_id,
+  order_description: lot.order_description,
+  shipment_no: lot.shipment_no,
+  item_lot_no: lot.item_lot_no,
+  item_unit_price: toDecimal(lot.item_unit_price),
+  currency: lot.currency,
+  quantity: toDecimal(lot.quantity),
+  item_total_value: toDecimal(lot.item_total_value),
+  weeks: lot.weeks,
+  contractual_delivery_date: lot.contractual_delivery_date,
+  inspection_call_date_tent: lot.inspection_call_date_tent,
+  inspection_call_date_act: lot.inspection_call_date_act,
+  inspection_date_advised: lot.inspection_date_advised,
+  no_of_inspection_days: lot.no_of_inspection_days,
+  inspection_at: lot.inspection_at,
+  actual_inspection_date: lot.actual_inspection_date,
+  units_inspected: lot.units_inspected,
+  after_inspection_pending_quantity: lot.after_inspection_pending_quantity,
+  after_inspection_pending_lot_id: lot.after_inspection_pending_lot_id,
+  mom_date: lot.mom_date,
+  dispatch_clearance_date: lot.dispatch_clearance_date,
+  inspection_delay_days: lot.inspection_delay_days,
+  dispatch_clearance_delay: lot.dispatch_clearance_delay,
+  etd_date: lot.etd_date,
+  actual_dispatch_date: lot.actual_dispatch_date,
+  eta_date: lot.eta_date,
+  actual_arrival_date: lot.actual_arrival_date,
+  requested_delivery_date: lot.requested_delivery_date,
+  customs_duty_exemption_date: lot.customs_duty_exemption_date,
+  asn_date: lot.asn_date,
+  actual_delivery_date: lot.actual_delivery_date,
+  meter_delivery_date: lot.meter_delivery_date,
+  delivery_note_no: lot.delivery_note_no,
+  delivered_quantity: lot.delivered_quantity,
+  pending_quantity: lot.pending_quantity,
+  remarks_on_delivery: lot.remarks_on_delivery,
+  delivery_total_value: toDecimal(lot.delivery_total_value),
+  grn_no: lot.grn_no,
+  pending_lot_id: lot.pending_lot_id,
+  main_units_delay_days: lot.main_units_delay_days,
+  accessories_delay_days: lot.accessories_delay_days,
+  delay_by_dewa: lot.delay_by_dewa,
+  other_delay_by_dewa: lot.other_delay_by_dewa,
+  reason_for_other_delay: lot.reason_for_other_delay,
+  contractual_payment_date: lot.contractual_payment_date,
+  invoice_no: lot.invoice_no,
+  invoice_date: lot.invoice_date,
+  invoice_value: toDecimal(lot.invoice_value),
+  srm_invoice_no: lot.srm_invoice_no,
+  srm_invoice_date: lot.srm_invoice_date,
+  srm_invoice_value: toDecimal(lot.srm_invoice_value),
+  payment_amount_received: toDecimal(lot.payment_amount_received),
+  payment_received_date: lot.payment_received_date,
+  delay_in_payment_days: lot.delay_in_payment_days,
+  reason_for_payment_delay: lot.reason_for_payment_delay,
+  commission_amount_for_lot: toDecimal(lot.commission_amount_for_lot),
+  commission_amount_for_delivered_quantity: toDecimal(lot.commission_amount_for_delivered_quantity),
+  commission_invoice_no: lot.commission_invoice_no,
+  commission_invoice_date: lot.commission_invoice_date,
+  commission_recieved_date: lot.commission_recieved_date,
+  commission_amount_invoiced: toDecimal(lot.commission_amount_invoiced),
+  balance_commission_amount: toDecimal(lot.balance_commission_amount),
+  ld_delay_units_or_meters: lot.ld_delay_units_or_meters,
+  ld_delay_units: lot.ld_delay_units,
+  ld_delay_meters: lot.ld_delay_meters,
+  delay_dewa_authorisation_days: lot.delay_dewa_authorisation_days,
+  remarks_delay: lot.remarks_delay,
+  force_majeure: lot.force_majeure,
+  force_majeure_days: lot.force_majeure_days,
+  actual_delay_for_ld: lot.actual_delay_for_ld,
+  actual_ld_amount: toDecimal(lot.actual_ld_amount),
+  max_ld_amount: toDecimal(lot.max_ld_amount),
+  chargeable_ld_amount: toDecimal(lot.chargeable_ld_amount),
+}
 
       const url = isNewLot
         ? `${API}/lot_monitoring`
@@ -913,6 +940,8 @@ if (field === "actual_delivery_date" || field === "payment_received_date") {
                                   {/* Before Delivery specific columns */}
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Shipment No</th>
 
+                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Order Date</th>
+                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Weeks</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Contractual Delivery</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Inspect Call (Tent)</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Inspect Call (Act)</th>
@@ -990,13 +1019,29 @@ if (field === "actual_delivery_date" || field === "payment_received_date") {
                                     </td>
 
                                     <td className="px-2 py-2">
-                                      <input
-                                        type="date"
-                                        value={lot.contractual_delivery_date || ''}
-                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'contractual_delivery_date', e.target.value)}
-                                        className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500  bg-purple-300 font-medium"
-                                      />
-                                    </td>
+  <input
+    type="text"
+    value={orders.find(o => o.order_id === lot.order_id)?.order_date || ''}
+    readOnly
+    className="w-24 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100"
+  />
+</td>
+<td className="px-2 py-2">
+  <input
+    type="number"
+    value={lot.weeks || ''}
+    onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'weeks', e.target.value)}
+    className="w-14 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
+  />
+</td>
+<td className="px-2 py-2">
+  <input
+    type="date"
+    value={lot.contractual_delivery_date || ''}
+    onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'contractual_delivery_date', e.target.value)}
+    className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500 bg-purple-300 font-medium"
+  />
+</td>
                                     <td className="px-2 py-2">
                                       <input
                                         type="date"
@@ -1496,10 +1541,9 @@ if (field === "actual_delivery_date" || field === "payment_received_date") {
                                       />
                                     </td>
                                     <td className="px-2 py-2">
-                                      <NumericInput
-  value={lot.invoice_value}
+                                      <NumericInput value={lot.invoice_value}
                                         onChange={(val) => updateLot(orderItem.order_item_detail_id, lotIndex, 'invoice_value', val)}
-                                        className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
+                                        className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500 bg-green-300"
                                       />
                                     </td>
                                     <td className="px-2 py-2">

@@ -355,6 +355,39 @@ export default function DashboardHome() {
     }
   }, [])
 
+  // ── Backup ──
+
+  const [backingUp, setBackingUp] = useState<'json' | 'sql' | null>(null)
+
+  const handleBackup = async (format: 'json' | 'sql') => {
+    const token = localStorage.getItem('kkabbas_token')
+    if (!token || !API) return
+
+    setBackingUp(format)
+    try {
+      const res = await fetch(`${API}/backup/${format}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error('Backup failed')
+
+      const blob = await res.blob()
+      const disposition = res.headers.get('Content-Disposition') || ''
+      const match = disposition.match(/filename="(.+)"/)
+      const filename = match ? match[1] : `kkabbas_backup.${format}`
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      console.error('Backup error:', err)
+    } finally {
+      setBackingUp(null)
+    }
+  }
+
   // ── Render ──
 
   if (loading) return <Loader />
@@ -364,9 +397,43 @@ export default function DashboardHome() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold text-gray-900">Welcome back, {userName}</h1>
-        <p className="text-sm text-gray-500 mt-1">Here is what needs your attention today.</p>
+      <div className="mb-5 flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Welcome back, {userName}</h1>
+          <p className="text-sm text-gray-500 mt-1">Here is what needs your attention today.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => handleBackup('json')}
+            disabled={backingUp !== null}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Download JSON backup"
+          >
+            {backingUp === 'json' ? (
+              <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            )}
+            JSON
+          </button>
+          <button
+            onClick={() => handleBackup('sql')}
+            disabled={backingUp !== null}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Download SQL backup"
+          >
+            {backingUp === 'sql' ? (
+              <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+            )}
+            SQL
+          </button>
+        </div>
       </div>
 
       {/* Two-panel area */}
@@ -376,7 +443,7 @@ export default function DashboardHome() {
         <div style={{ width: `${leftWidthPercent}%` }} className="flex flex-col min-w-0 bg-white">
 
           {/* Panel header */}
-          <div className="flex items-center justify-between px-5 py-3 bg-gradient-to-r from-rose-500 to-orange-400">
+          <div className="flex items-center justify-between px-5 py-3.5 bg-gradient-to-r from-rose-400 to-orange-300">
             <div className="flex items-center gap-2.5">
               <div className="text-white"><BellIcon /></div>
               <h2 className="font-semibold text-white text-[15px]">Reminders</h2>
@@ -485,8 +552,8 @@ export default function DashboardHome() {
               todos.map(t => (
                 <div
                   key={t.todo_id}
-                  className={`group flex items-start gap-3 px-3 py-2.5 rounded-lg transition border border-green-300 ${
-                    t.is_done ? 'bg-gray-200' : 'hover:bg-gray-100'
+                  className={`group flex items-start gap-3 px-3 py-2.5 rounded-lg transition ${
+                    t.is_done ? 'bg-gray-50' : 'hover:bg-gray-50'
                   }`}
                 >
                   {/* Content */}
