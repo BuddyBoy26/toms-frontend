@@ -371,9 +371,9 @@ export default function DashboardHome() {
       if (!res.ok) throw new Error('Backup failed')
 
       const blob = await res.blob()
-      const disposition = res.headers.get('Content-Disposition') || ''
-      const match = disposition.match(/filename="(.+)"/)
-      const filename = match ? match[1] : `kkabbas_backup.${format}`
+      const now = new Date()
+const ts = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
+const filename = `kkabbas_backup_${ts}.${format}`
 
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
