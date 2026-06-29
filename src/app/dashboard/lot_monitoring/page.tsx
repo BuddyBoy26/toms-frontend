@@ -450,14 +450,12 @@ export default function LotMonitoringPage() {
       }
     }
 
-    if (field === "actual_delivery_date" || field === "contractual_delivery_date") {
-      const actualDeliveryDate = new Date(updatedLots[lotIndex].actual_delivery_date ?? '');
-      const contractualDeliveryDate = new Date(updatedLots[lotIndex].contractual_delivery_date ?? '');
-
-      if (!isNaN(actualDeliveryDate.getTime()) && !isNaN(contractualDeliveryDate.getTime())) {
-        const diffMs = actualDeliveryDate.getTime() - contractualDeliveryDate.getTime();
-        const diffDays = diffMs / (1000 * 60 * 60 * 24);
-        updatedLots[lotIndex].main_units_delay_days = diffDays > 0 ? diffDays : 0;
+    if (field === "actual_delivery_date") {
+      const cdd = updatedLots[lotIndex].actual_delivery_date;
+      if (cdd) {
+        const d = new Date(cdd);
+        d.setDate(d.getDate() - 75);
+        updatedLots[lotIndex].contractual_payment_date = d.toISOString().split('T')[0];
       }
     }
 
@@ -503,11 +501,24 @@ export default function LotMonitoringPage() {
     }
 
     if (field === "actual_delivery_date" || field === "payment_received_date") {
-      const actualDeliveryDate = new Date(updatedLots[lotIndex].actual_delivery_date ?? '');
+      const contractualPaymentDate = new Date(updatedLots[lotIndex].contractual_payment_date ?? '');
       const paymentReceivedDate = new Date(updatedLots[lotIndex].payment_received_date ?? '');
 
-      if (!isNaN(actualDeliveryDate.getTime()) && !isNaN(paymentReceivedDate.getTime())) {
-        const diffMs = paymentReceivedDate.getTime() - actualDeliveryDate.getTime();
+      if (!isNaN(contractualPaymentDate.getTime()) && !isNaN(paymentReceivedDate.getTime())) {
+        const diffMs = paymentReceivedDate.getTime() - contractualPaymentDate.getTime();
+        const diffDays = diffMs / (1000 * 60 * 60 * 24);
+        updatedLots[lotIndex].delay_in_payment_days = diffDays > 0 ? diffDays : 0;
+      }
+    }
+
+
+
+    if (field === "contractual_payment_date" || field === "payment_received_date") {
+      const contractualPaymentDate = new Date(updatedLots[lotIndex].contractual_payment_date ?? '');
+      const paymentReceivedDate = new Date(updatedLots[lotIndex].payment_received_date ?? '');
+
+      if (!isNaN(contractualPaymentDate.getTime()) && !isNaN(paymentReceivedDate.getTime())) {
+        const diffMs = paymentReceivedDate.getTime() - contractualPaymentDate.getTime();
         const diffDays = diffMs / (1000 * 60 * 60 * 24);
         updatedLots[lotIndex].delay_in_payment_days = diffDays > 0 ? diffDays : 0;
       }
@@ -571,6 +582,18 @@ export default function LotMonitoringPage() {
       updatedLots[lotIndex].chargeable_ld_amount = updatedLots[lotIndex].actual_ld_amount < updatedLots[lotIndex].max_ld_amount ? updatedLots[lotIndex].actual_ld_amount : updatedLots[lotIndex].max_ld_amount
     }
 
+    if (field === "inspection_date_advised" || field === "inspection_call_date_act") {
+      const inspectionDateAdvised = new Date(updatedLots[lotIndex].inspection_date_advised ?? '');
+      const inspectionCallDateActual = new Date(updatedLots[lotIndex].inspection_call_date_act ?? '');
+
+      if (!isNaN(inspectionDateAdvised.getTime()) && !isNaN(inspectionCallDateActual.getTime())) {
+        const diffMs = inspectionDateAdvised.getTime() - inspectionCallDateActual.getTime();
+        const diffDays = 21 - (diffMs / (1000 * 60 * 60 * 24));
+        updatedLots[lotIndex].delay_dewa_authorisation_days = diffDays > 0 ? diffDays : 0;
+      }
+    }
+
+    
 
 
 
@@ -875,7 +898,7 @@ export default function LotMonitoringPage() {
             const [y, m, d] = selectedOrder.order_date.split('-')
             return (
               <div className="pb-0.5">
-                <p className="text-xs text-gray-500 mb-1">Order Date</p>
+                <p className="text-xs text-gray-500 mb-1">PO Commencement Date</p>
                 <p className="text-sm font-semibold text-gray-800">{d}/{m}/{y}</p>
               </div>
             )
@@ -965,8 +988,8 @@ export default function LotMonitoringPage() {
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Pending Qty (After)</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">MOM Date</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Dispatch Clear Date</th>
-                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Inspect Delay</th>
-                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Dispatch Delay</th>
+                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Inspn Delay</th>
+                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Disp Clrn Delay</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">ETD Date</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Actual Dispatch</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">ETA Date</th>
@@ -1026,7 +1049,7 @@ export default function LotMonitoringPage() {
                                         type="text"
                                         value={lot.shipment_no || ''}
                                         onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'shipment_no', e.target.value)}
-                                        className="w-20 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
+                                        className="w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
 
@@ -1133,7 +1156,7 @@ export default function LotMonitoringPage() {
                                         type="number"
                                         value={lot.inspection_delay_days || ''}
                                         readOnly
-                                        className="w-16 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100"
+                                        className="w-12 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100"
                                       />
                                     </td>
                                     <td className="px-2 py-2">
@@ -1141,7 +1164,7 @@ export default function LotMonitoringPage() {
                                         type="number"
                                         value={lot.dispatch_clearance_delay || ''}
                                         readOnly
-                                        className="w-18 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100"
+                                        className="w-12 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100"
                                       />
                                     </td>
                                     <td className="px-2 py-2">
@@ -1226,19 +1249,20 @@ export default function LotMonitoringPage() {
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Item Total Lot Amount</th>
 
                                   {/* After Delivery specific columns */}
+                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Shipment No</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Requested Delivery</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Customs Exemption</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">ASN Date</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Actual Delivery</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Accessories Delivery</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Delivery Note No</th>
-                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Delivered Qty</th>
+                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Delive- red Qty</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Pending Qty</th>
                                   {/* <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Delivery Value</th> */}
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">GRN No</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Remarks</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Main Units Delay</th>
-                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Accessories Delay</th>
+                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Access- ories Delay</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Delay by DEWA</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Other Delay DEWA</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Reason Other Delay</th>
@@ -1285,6 +1309,14 @@ export default function LotMonitoringPage() {
                                     {/* After Delivery specific columns */}
                                     <td className="px-2 py-2">
                                       <input
+                                        type="text"
+                                        value={lot.shipment_no || ''}
+                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'shipment_no', e.target.value)}
+                                        className="w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
+                                      />
+                                    </td>
+                                    <td className="px-2 py-2">
+                                      <input
                                         type="date"
                                         value={lot.requested_delivery_date || ''}
                                         onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'requested_delivery_date', e.target.value)}
@@ -1328,7 +1360,7 @@ export default function LotMonitoringPage() {
                                         type="text"
                                         value={lot.delivery_note_no || ''}
                                         onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'delivery_note_no', e.target.value)}
-                                        className="w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
+                                        className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
                                     <td className="px-2 py-2">
@@ -1336,7 +1368,7 @@ export default function LotMonitoringPage() {
                                         type="number"
                                         value={lot.delivered_quantity || ''}
                                         onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'delivered_quantity', e.target.value)}
-                                        className="w-20 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
+                                        className="w-14 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
                                     <td className="px-2 py-2">
@@ -1385,7 +1417,7 @@ export default function LotMonitoringPage() {
                                         type="number"
                                         value={lot.accessories_delay_days || ''}
                                         readOnly
-                                        className="w-20 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100"
+                                        className="w-16 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100"
                                       />
                                     </td>
                                     <td className="px-2 py-2">
@@ -1462,6 +1494,7 @@ export default function LotMonitoringPage() {
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Item Total Lot Amount</th>
 
                                   {/* After Payment specific columns */}
+                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Shipment No</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Contractual Payment Date</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Invoice No</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Invoice Date</th>
@@ -1523,6 +1556,14 @@ export default function LotMonitoringPage() {
                                     {/* After Payment specific columns */}
                                     <td className="px-2 py-2">
                                       <input
+                                        type="text"
+                                        value={lot.shipment_no || ''}
+                                        onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'shipment_no', e.target.value)}
+                                        className="w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
+                                      />
+                                    </td>
+                                    <td className="px-2 py-2">
+                                      <input
                                         type="date"
                                         value={lot.contractual_payment_date || ''}
                                         onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'contractual_payment_date', e.target.value)}
@@ -1534,7 +1575,7 @@ export default function LotMonitoringPage() {
                                         type="text"
                                         value={lot.invoice_no || ''}
                                         onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'invoice_no', e.target.value)}
-                                        className="w-18 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
+                                        className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
                                     <td className="px-2 py-2">
@@ -1711,10 +1752,10 @@ export default function LotMonitoringPage() {
                                   {/* LD specific columns */}
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">LD Units / Accessories</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">LD Delay Units</th>
-                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">LD Delay Accessories</th>
-                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Delay DEWA Auth</th>
-                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Force Majeure</th>
-                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Force Majeure Days</th>
+                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">LD Delay Accessr</th>
+                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Ispn Call Delay</th>
+                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Force Maj</th>
+                                  <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Force Maj Days</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Remarks Delay</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Actual Delay LD</th>
                                   <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Actual LD Amount</th>
@@ -1776,7 +1817,7 @@ export default function LotMonitoringPage() {
                                         type="number"
                                         value={lot.ld_delay_units || ''}
                                         readOnly
-                                        className="w-20 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100"
+                                        className="w-18 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100"
                                       />
                                     </td>
                                     <td className="px-2 py-2">
@@ -1784,7 +1825,7 @@ export default function LotMonitoringPage() {
                                         type="number"
                                         value={lot.ld_delay_meters || ''}
                                         readOnly
-                                        className="w-24 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100"
+                                        className="w-18 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100"
                                       />
                                     </td>
                                     <td className="px-2 py-2">
@@ -1810,7 +1851,7 @@ export default function LotMonitoringPage() {
                                         type="number"
                                         value={lot.force_majeure_days || ''}
                                         onChange={(e) => updateLot(orderItem.order_item_detail_id, lotIndex, 'force_majeure_days', e.target.value)}
-                                        className="w-16 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
+                                        className="w-12 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500"
                                       />
                                     </td>
                                     <td className="px-2 py-2">

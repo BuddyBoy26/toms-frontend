@@ -463,8 +463,8 @@ export default function TenderCompanyItemsTable({
               <tr>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item No (DEWA)</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price/Unit</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Qty</th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Price/Unit</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Value</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Curr</th>
                 <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Forex Rate</th>
@@ -510,17 +510,6 @@ export default function TenderCompanyItemsTable({
                     />
                   </td>
 
-                  {/* Price */}
-                  <td className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={item.item_price}
-                      onChange={(e) => handleInputChange(index, 'item_price', e.target.value)}
-                      className="w-28 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"
-                      placeholder="0.00"
-                    />
-                  </td>
-
                   {/* Quantity */}
                   <td className="px-3 py-2">
                     <input
@@ -529,6 +518,17 @@ export default function TenderCompanyItemsTable({
                       onChange={(e) => handleInputChange(index, 'item_quantity', e.target.value)}
                       className="w-24 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"
                       placeholder="0"
+                    />
+                  </td>
+
+                  {/* Price */}
+                  <td className="px-3 py-2">
+                    <input
+                      type="text"
+                      value={item.item_price}
+                      onChange={(e) => handleInputChange(index, 'item_price', e.target.value)}
+                      className="w-28 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"
+                      placeholder="0.00"
                     />
                   </td>
 
