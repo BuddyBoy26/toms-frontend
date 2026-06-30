@@ -48,12 +48,12 @@ const parseDateArray = (dateStr: string): string[] | null => {
 // --- Interfaces ---
 interface GridRow {
   id: number; type: 'TBG' | 'MPG' | 'PBG'; ref_doc_no: string; guarantee_no: string;
-  tendered_value?: string; // NEW FIELD: Calculated from tender_company_items
+  tendered_value?: string;
   guarantee_value: string; expiry_date: string; status: string;
-  cg_id: number | null; cg_bank: string; cg_status: string;
+  cg_id: number | null; cg_issuing_bank: string; cg_status: string;
   rawGuarantee: any; rawCG: any;
-  isNewCG?: boolean; 
-  [key: string]: any; 
+  isNewCG?: boolean;
+  [key: string]: any;
 }
 
 export default function GuaranteesDashboard() {
@@ -65,14 +65,14 @@ export default function GuaranteesDashboard() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
+
   const [rawTenders, setRawTenders] = useState<any[]>([])
   const [rawOrders, setRawOrders] = useState<any[]>([])
   const [rawTcs, setRawTcs] = useState<any[]>([])
   const [rawMpgs, setRawMpgs] = useState<any[]>([])
   const [rawPbgs, setRawPbgs] = useState<any[]>([])
   const [rawCgs, setRawCgs] = useState<any[]>([])
-  const [rawTcItems, setRawTcItems] = useState<any[]>([]) // Store items for calculation
+  const [rawTcItems, setRawTcItems] = useState<any[]>([])
 
   const [tbgRows, setTbgRows] = useState<GridRow[]>([])
   const [mpgRows, setMpgRows] = useState<GridRow[]>([])
@@ -83,16 +83,15 @@ export default function GuaranteesDashboard() {
   const [formTbg, setFormTbg] = useState<GridRow | null>(null)
   const [formMpg, setFormMpg] = useState<GridRow | null>(null)
   const [formPbg, setFormPbg] = useState<GridRow | null>(null)
-  
+
   const [extDates, setExtDates] = useState({ TBG: '', MPG: '', PBG: '' })
-  
+
   const [collapsedSections, setCollapsedSections] = useState({ tbg: false, mpg: false, pbg: false })
   const toggleSection = (key: keyof typeof collapsedSections) => setCollapsedSections(prev => ({ ...prev, [key]: !prev[key] }))
 
   const [formCollapsed, setFormCollapsed] = useState({ tbg: false, mpg: false, pbg: false })
   const toggleFormSection = (key: keyof typeof formCollapsed) => setFormCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
 
-  // --- Core Data Fetch ---
   const fetchAllData = async () => {
     setLoading(true)
     setError(null)
@@ -108,7 +107,7 @@ export default function GuaranteesDashboard() {
         fetch(`${API}/performance_guarantee`, { headers }),
         fetch(`${API}/order_detail`, { headers }),
         fetch(`${API}/tender`, { headers }),
-        fetch(`${API}/tender_company_items`, { headers }) // Fetch Items for Tendered Value calculation
+        fetch(`${API}/tender_company_items`, { headers })
       ])
 
       const cgs = await cgRes.json().catch(() => [])
@@ -127,10 +126,8 @@ export default function GuaranteesDashboard() {
       setRawTenders(tenders)
       setRawTcItems(tcItems)
 
-      console.log(mpgs)
-
       mapGridData(cgs, tcs, mpgs, pbgs, orders, tenders, tcItems)
-      
+
       if (selectedOrderId || selectedTenderId) {
         mapFormData(selectedTenderId || null, selectedOrderId || null, cgs, tcs, mpgs, pbgs, tcItems)
       }
@@ -144,11 +141,9 @@ export default function GuaranteesDashboard() {
 
   useEffect(() => { fetchAllData() }, [API])
 
-  // --- Mapping Functions ---
-  const getCG = (type: string, refNo: string, cgsList: any[]) => 
+  const getCG = (type: string, refNo: string, cgsList: any[]) =>
     cgsList.find((cg: any) => cg.guarantee_type === type && cg.guarantee_ref_number === refNo)
 
-  // Calculates the net "Tendered Value" (Total Item Value - Total Discounts)
   const calculateTenderedValue = (tcId: number, itemsList: any[]): string => {
     const itemsForTc = itemsList.filter((i: any) => i.tendering_companies_id === tcId)
     let finalValue = 0
@@ -174,20 +169,26 @@ export default function GuaranteesDashboard() {
       guarantee_value: String(item[isTbg ? 'tbg_value' : `${prefix}_value`] || ''),
       expiry_date: formatDateString(item[isTbg ? 'tbg_expiry_date' : `${prefix}_expiry_date`]),
       status: isTbg ? 'N/A' : (item.pending_status || 'NOT Issued'),
-      
+
+      // Spread the raw guarantee item FIRST so its own (irrelevant) cg_* columns
+      // don't clobber the actual Counter Guarantee fields set below.
+      rawGuarantee: item,
+      rawCG: matchedCG || null,
+      ...item,
+
+      // CG fields — applied AFTER the spread on purpose. The tendering_companies /
+      // performance_guarantee / mpg rows each carry their own stray cg_bank / cg_date /
+      // cg_expiry_date columns (always null) which would otherwise overwrite these.
       cg_id: matchedCG?.cg_id || null,
       cg_type: type,
       cg_ref_number: matchedCG?.guarantee_ref_number || '',
       cg_date: formatDateString(matchedCG?.cg_date),
-      cg_bank: matchedCG?.issuing_bank || '',
+      cg_issuing_bank: matchedCG?.issuing_bank || '',
       cg_expiry_date: formatDateString(matchedCG?.expiry_date),
       cg_remarks: matchedCG?.remarks || '',
       cg_status: matchedCG?.pending_status || 'NOT Issued',
       isNewCG: false,
-      
-      rawGuarantee: item,
-      rawCG: matchedCG || null,
-      ...item,
+
       extension_dates_array: Array.isArray(extArray) ? extArray.map(formatDateString) : []
     }
 
@@ -239,7 +240,6 @@ export default function GuaranteesDashboard() {
     }
   }
 
-  // --- Form & Grid Handlers ---
   const handleTenderSelect = (tIdStr: string) => {
     const tId = tIdStr === '' ? '' : Number(tIdStr)
     setSelectedTenderId(tId)
@@ -267,11 +267,10 @@ export default function GuaranteesDashboard() {
   const availableOrders = selectedTenderId === '' ? rawOrders : rawOrders.filter(o => o.tender_id === selectedTenderId)
 
   const handleGridRowChange = (type: 'TBG' | 'MPG' | 'PBG', rowId: number, field: string, value: any) => {
-  const targetSet = type === 'TBG' ? setTbgRows : type === 'MPG' ? setMpgRows : setPbgRows
-  targetSet(prev => prev.map(r => (r.id === rowId ? { ...r, [field]: value } : r)))
-}
+    const targetSet = type === 'TBG' ? setTbgRows : type === 'MPG' ? setMpgRows : setPbgRows
+    targetSet(prev => prev.map(r => (r.id === rowId ? { ...r, [field]: value } : r)))
+  }
 
-  // Fixed React State Batching implementation
   const handleFormChange = (type: 'TBG' | 'MPG' | 'PBG', field: string, value: any) => {
     if (type === 'TBG') {
       setFormTbg(prev => prev ? { ...prev, [field]: value } : null)
@@ -282,13 +281,12 @@ export default function GuaranteesDashboard() {
     }
   }
 
-  // --- Inline CG Creation ---
   const activateInlineCG = (type: 'TBG' | 'MPG' | 'PBG') => {
     const form = type === 'TBG' ? formTbg : type === 'MPG' ? formMpg : formPbg
     if (!form) return
-    
-    const activeRefNo = type === 'TBG' 
-      ? (form.tbg_credit_card_option === 0 ? form.tbg_no : form.credit_card_payment_ref) 
+
+    const activeRefNo = type === 'TBG'
+      ? (form.tbg_credit_card_option === 0 ? form.tbg_no : form.credit_card_payment_ref)
       : (form.guarantee_no || form[`${type.toLowerCase()}_no`])
 
     const updatedForm = {
@@ -297,7 +295,7 @@ export default function GuaranteesDashboard() {
       isNewCG: true,
       cg_ref_number: activeRefNo || '',
       cg_date: '',
-      cg_bank: '',
+      cg_issuing_bank: '',
       cg_expiry_date: '',
       cg_remarks: '',
       cg_status: 'NOT Issued'
@@ -326,16 +324,15 @@ export default function GuaranteesDashboard() {
     handleFormChange(type, 'extension_dates_array', newDates)
   }
 
-  // --- Save Logic ---
   const executeSave = async (payloadSource: GridRow, type: 'TBG' | 'MPG' | 'PBG') => {
     const token = localStorage.getItem('kkabbas_token')
     const headers = { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }
 
     const gPayload = { ...payloadSource.rawGuarantee }
     let gUrl = ''
-    
+
     const prefix = type === 'MPG' ? 'mpg' : 'pg'
-    const calculatedRefNo = type === 'TBG' 
+    const calculatedRefNo = type === 'TBG'
       ? (payloadSource.tbg_credit_card_option === 0 ? payloadSource.tbg_no : payloadSource.credit_card_payment_ref)
       : (payloadSource.guarantee_no || payloadSource[`${prefix}_no`])
 
@@ -375,7 +372,6 @@ export default function GuaranteesDashboard() {
       gPayload.remarks = payloadSource.remarks || payloadSource.rawGuarantee.remarks || null
       gPayload.pending_status = payloadSource.status || gPayload.pending_status
       gUrl = `${API}/material_performance_guarantee/${payloadSource.id}`
-      console.log("trigger mpg")
       triggerReminders('material_performance_guarantee')
 
     } else if (type === 'PBG') {
@@ -402,12 +398,12 @@ export default function GuaranteesDashboard() {
     if (payloadSource.cg_id) {
       const cgMethod = payloadSource.isNewCG ? 'POST' : 'PUT'
       const cgUrl = payloadSource.isNewCG ? `${API}/counter_guarantee` : `${API}/counter_guarantee/${payloadSource.cg_id}`
-      
+
       const cgPayload = payloadSource.isNewCG ? {
         guarantee_type: type,
         guarantee_ref_number: calculatedRefNo || '',
         cg_date: payloadSource.cg_date || null,
-        issuing_bank: payloadSource.cg_bank || null,
+        issuing_bank: payloadSource.cg_issuing_bank || null,
         expiry_date: payloadSource.cg_expiry_date || null,
         remarks: payloadSource.cg_remarks || null,
         pending_status: payloadSource.cg_status || 'NOT Issued',
@@ -415,12 +411,12 @@ export default function GuaranteesDashboard() {
         ...payloadSource.rawCG,
         guarantee_ref_number: calculatedRefNo,
         cg_date: payloadSource.cg_date || payloadSource.rawCG.cg_date || null,
-        issuing_bank: payloadSource.cg_bank || payloadSource.rawCG.issuing_bank || null,
+        issuing_bank: payloadSource.cg_issuing_bank || payloadSource.rawCG.issuing_bank || null,
         expiry_date: payloadSource.cg_expiry_date || payloadSource.rawCG.expiry_date || null,
         remarks: payloadSource.cg_remarks || payloadSource.rawCG.remarks || null,
         pending_status: payloadSource.cg_status || payloadSource.rawCG.pending_status,
       }
-      
+
       const cgRes = await fetch(cgUrl, { method: cgMethod, headers, body: JSON.stringify(cgPayload) })
       if (!cgRes.ok) throw new Error(`Failed to save Counter Guarantee for ${type}`)
     }
@@ -452,17 +448,14 @@ export default function GuaranteesDashboard() {
 
   const saveAllForms = async () => {
     setSaving(true); setError(null);
-    console.log("trigger?")
     try {
       if (formTbg) {
         await executeSave(formTbg, 'TBG')
         triggerReminders('performance_guarantee')
       }
       if (formMpg) {
-        console.log("trigger mpg")
         triggerReminders('material_performance_guarantee')
         await executeSave(formMpg, 'MPG')
-        console.log("trigger mpg")
         triggerReminders('material_performance_guarantee')
       }
       if (formPbg) {
@@ -483,7 +476,6 @@ export default function GuaranteesDashboard() {
     }
   }
 
-  // --- Render Helpers ---
   const renderStatusDropdown = (value: string, onChange: (val: string) => void, disabled = false) => (
     <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled} className={`w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500 ${disabled ? 'bg-gray-100 text-gray-500' : 'bg-white'}`}>
       <option value="NOT Issued">NOT Issued</option>
@@ -520,11 +512,9 @@ export default function GuaranteesDashboard() {
     </select>
   )
 
-  // --- Filtered Grid Data ---
   const filteredTbgRows = statusFilter === 'All' ? tbgRows : tbgRows.filter(r => r.status === statusFilter || (statusFilter === 'NOT Issued' && r.status === 'N/A'))
   const filteredMpgRows = statusFilter === 'All' ? mpgRows : mpgRows.filter(r => r.status === statusFilter)
   const filteredPbgRows = statusFilter === 'All' ? pbgRows : pbgRows.filter(r => r.status === statusFilter)
-  console.log(filteredPbgRows)
 
   if (loading && rawTenders.length === 0) return <Loader />
 
@@ -552,7 +542,7 @@ export default function GuaranteesDashboard() {
             <option value="po_tender">List by PO / Tender Number (Form View)</option>
           </select>
         </div>
-        
+
         {viewMode === 'guarantees' && (
           <div className="flex-1 max-w-sm">
             <label className="block text-sm font-medium text-gray-700 mb-1">Filter by Status:</label>
@@ -589,9 +579,6 @@ export default function GuaranteesDashboard() {
 
       {error && <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md">{error}</div>}
 
-      {/* =====================================================================
-          VIEW MODE 1: GUARANTEES GRID
-          ===================================================================== */}
       {viewMode === 'guarantees' ? (
         <div className="space-y-6">
           {/* TBG Grid */}
@@ -616,7 +603,6 @@ export default function GuaranteesDashboard() {
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Tendered Value</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Value</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Currency</th>
-                          {/* <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Curr (NQ)</th> */}
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Date</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Expiry Date</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Submitted</th>
@@ -645,7 +631,6 @@ export default function GuaranteesDashboard() {
                             <td className="px-2 py-2"><input type="text" value={formatNumber(row.tendered_value || '')} readOnly className="w-24 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100 font-medium text-gray-700" title="Calculated from Tender Items" /></td>
                             <td className="px-2 py-2"><input type="text" value={formatNumber(row.guarantee_value || '')} onChange={(e) => handleGridRowChange('TBG', row.id, 'tbg_value', formatNumber(e.target.value))} className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2">{renderGridCurrencyDropdown(row.tendering_currency || 'AED', (val) => handleGridRowChange('TBG', row.id, 'tendering_currency', val))}</td>
-                            {/* <td className="px-2 py-2">{renderGridCurrencyDropdown(row.tendering_currency_nq || 'AED', (val) => handleGridRowChange('TBG', row.id, 'tendering_currency_nq', val))}</td> */}
                             <td className="px-2 py-2"><input type="date" value={row.tbg_date || ''} onChange={(e) => handleGridRowChange('TBG', row.id, 'tbg_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.expiry_date || ''} onChange={(e) => handleGridRowChange('TBG', row.id, 'expiry_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.tbg_submitted_date || ''} onChange={(e) => handleGridRowChange('TBG', row.id, 'tbg_submitted_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
@@ -659,7 +644,7 @@ export default function GuaranteesDashboard() {
                             </td>
                             <td className="px-2 py-2 border-l-2 border-gray-100"><input type="text" value={row.cg_ref_number || ''} disabled className="w-20 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.cg_date || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('TBG', row.id, 'cg_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="text" value={row.cg_bank || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('TBG', row.id, 'cg_bank', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="text" value={row.cg_issuing_bank || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('TBG', row.id, 'cg_issuing_bank', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.cg_expiry_date || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('TBG', row.id, 'cg_expiry_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2">{row.cg_id ? renderGridStatusDropdown(row.cg_status, (v) => handleGridRowChange('TBG', row.id, 'cg_status', v)) : <span className="text-gray-400 text-xs italic">N/A</span>}</td>
                             <td className="px-2 py-2"><input type="text" value={row.cg_remarks || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('TBG', row.id, 'cg_remarks', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
@@ -744,7 +729,7 @@ export default function GuaranteesDashboard() {
                             </td>
                             <td className="px-2 py-2 border-l-2 border-gray-100"><input type="text" value={row.cg_ref_number || ''} disabled className="w-20 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.cg_date || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('PBG', row.id, 'cg_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="text" value={row.cg_bank || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('PBG', row.id, 'cg_bank', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="text" value={row.cg_issuing_bank || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('PBG', row.id, 'cg_issuing_bank', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.cg_expiry_date || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('PBG', row.id, 'cg_expiry_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2">{row.cg_id ? renderGridStatusDropdown(row.cg_status, (v) => handleGridRowChange('PBG', row.id, 'cg_status', v)) : <span className="text-gray-400 text-xs italic">N/A</span>}</td>
                             <td className="px-2 py-2"><input type="text" value={row.cg_remarks || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('PBG', row.id, 'cg_remarks', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
@@ -831,7 +816,7 @@ export default function GuaranteesDashboard() {
                             </td>
                             <td className="px-2 py-2 border-l-2 border-gray-100"><input type="text" value={row.cg_ref_number || ''} disabled className="w-20 px-2 py-1 text-xs border border-gray-300 rounded bg-gray-100" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.cg_date || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('MPG', row.id, 'cg_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="text" value={row.cg_bank || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('MPG', row.id, 'cg_bank', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="text" value={row.cg_issuing_bank || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('MPG', row.id, 'cg_issuing_bank', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.cg_expiry_date || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('MPG', row.id, 'cg_expiry_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2">{row.cg_id ? renderGridStatusDropdown(row.cg_status, (v) => handleGridRowChange('MPG', row.id, 'cg_status', v)) : <span className="text-gray-400 text-xs italic">N/A</span>}</td>
                             <td className="px-2 py-2"><input type="text" value={row.cg_remarks || ''} disabled={!row.cg_id} onChange={(e) => handleGridRowChange('MPG', row.id, 'cg_remarks', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
@@ -857,14 +842,11 @@ export default function GuaranteesDashboard() {
             </div>
           </div>
 
-          
+
         </div>
 
       ) : (
 
-      /* =====================================================================
-         VIEW MODE 2: PO / TENDER FORMS
-         ===================================================================== */
         <div className="space-y-6 mt-6">
           {!selectedTenderId && !selectedOrderId ? (
             <div className="bg-yellow-50 border border-yellow-200 p-6 text-center rounded-lg shadow-sm">
@@ -916,10 +898,6 @@ export default function GuaranteesDashboard() {
                           <label className="block text-xs font-medium text-gray-700 mb-1">Currency (Main)</label>
                           {renderCurrencyDropdown(formTbg.tendering_currency || 'AED', (val) => handleFormChange('TBG', 'tendering_currency', val))}
                         </div>
-                        {/* <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Currency (NQ)</label>
-                          {renderCurrencyDropdown(formTbg.tendering_currency_nq || 'AED', (val) => handleFormChange('TBG', 'tendering_currency_nq', val))}
-                        </div> */}
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">Date</label>
                           <input type="date" value={formTbg.tbg_date || ''} onChange={(e) => handleFormChange('TBG', 'tbg_date', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
@@ -970,7 +948,6 @@ export default function GuaranteesDashboard() {
                         </div>
                       )}
 
-                      {/* Section 3: CG */}
                       <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-6">
                         <div className="flex justify-between items-center mb-3">
                           <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Counter Guarantee Details</h3>
@@ -980,7 +957,7 @@ export default function GuaranteesDashboard() {
                             </button>
                           )}
                         </div>
-                        
+
                         {formTbg.cg_id ? (
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
@@ -993,7 +970,7 @@ export default function GuaranteesDashboard() {
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">CG Bank</label>
-                              <input type="text" value={formTbg.cg_bank || ''} onChange={(e) => handleFormChange('TBG', 'cg_bank', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                              <input type="text" value={formTbg.cg_issuing_bank || ''} onChange={(e) => handleFormChange('TBG', 'cg_issuing_bank', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">CG Expiry Date</label>
@@ -1014,9 +991,6 @@ export default function GuaranteesDashboard() {
                       </div>
 
                       <div className="flex justify-end items-center gap-4 pt-4 border-t border-gray-200">
-                        {/* <button onClick={() => openEditTabs('TBG', formTbg.id, formTbg.cg_id, formTbg.isNewCG)} className="text-blue-600 hover:text-blue-800 font-semibold text-sm hover:underline">
-                          Open Edit Pages (Tabs)
-                        </button> */}
                         <button onClick={() => saveSingleForm('TBG')} disabled={saving} className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50">
                           Save This Guarantee
                         </button>
@@ -1113,7 +1087,6 @@ export default function GuaranteesDashboard() {
                         </div>
                       )}
 
-                      {/* Section 3: CG */}
                       <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-6">
                         <div className="flex justify-between items-center mb-3">
                           <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Counter Guarantee Details</h3>
@@ -1123,7 +1096,7 @@ export default function GuaranteesDashboard() {
                             </button>
                           )}
                         </div>
-                        
+
                         {formPbg.cg_id ? (
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
@@ -1136,7 +1109,7 @@ export default function GuaranteesDashboard() {
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">CG Bank</label>
-                              <input type="text" value={formPbg.cg_bank || ''} onChange={(e) => handleFormChange('PBG', 'cg_bank', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                              <input type="text" value={formPbg.cg_issuing_bank || ''} onChange={(e) => handleFormChange('PBG', 'cg_issuing_bank', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">CG Expiry Date</label>
@@ -1157,9 +1130,6 @@ export default function GuaranteesDashboard() {
                       </div>
 
                       <div className="flex justify-end items-center gap-4 pt-4 border-t border-gray-200">
-                        {/* <button onClick={() => openEditTabs('PBG', formPbg.id, formPbg.cg_id, formPbg.isNewCG)} className="text-purple-600 hover:text-purple-800 font-semibold text-sm hover:underline">
-                          Open Edit Pages (Tabs)
-                        </button> */}
                         <button onClick={() => saveSingleForm('PBG')} disabled={saving} className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition disabled:opacity-50">
                           Save This Guarantee
                         </button>
@@ -1194,10 +1164,6 @@ export default function GuaranteesDashboard() {
                     <>
                       <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">MPG Details</h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-                        {/* <div>
-                          <label className="block text-xs font-medium text-gray-700 mb-1">Participated</label>
-                          <select value={formMpg.participated} onChange={(e) => handleFormChange('MPG', 'participated', Number(e.target.value))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"><option value="0">No</option><option value="1">Yes</option></select>
-                        </div> */}
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
                           <select value={formMpg.bank_or_deposit} onChange={(e) => handleFormChange('MPG', 'bank_or_deposit', Number(e.target.value))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"><option value="0">Bank</option><option value="1">Deposit</option></select>
@@ -1260,7 +1226,6 @@ export default function GuaranteesDashboard() {
                         </div>
                       )}
 
-                      {/* Section 3: CG */}
                       <div className="bg-gray-50 p-4 rounded border border-gray-200 mb-6">
                         <div className="flex justify-between items-center mb-3">
                           <h3 className="text-sm font-bold text-gray-700 uppercase tracking-wider">Counter Guarantee Details</h3>
@@ -1270,7 +1235,7 @@ export default function GuaranteesDashboard() {
                             </button>
                           )}
                         </div>
-                        
+
                         {formMpg.cg_id ? (
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
@@ -1283,7 +1248,7 @@ export default function GuaranteesDashboard() {
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">CG Bank</label>
-                              <input type="text" value={formMpg.cg_bank || ''} onChange={(e) => handleFormChange('MPG', 'cg_bank', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                              <input type="text" value={formMpg.cg_issuing_bank || ''} onChange={(e) => handleFormChange('MPG', 'cg_issuing_bank', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
                             </div>
                             <div>
                               <label className="block text-xs font-medium text-gray-700 mb-1">CG Expiry Date</label>
@@ -1304,9 +1269,6 @@ export default function GuaranteesDashboard() {
                       </div>
 
                       <div className="flex justify-end items-center gap-4 pt-4 border-t border-gray-200">
-                        {/* <button onClick={() => openEditTabs('MPG', formMpg.id, formMpg.cg_id, formMpg.isNewCG)} className="text-green-600 hover:text-green-800 font-semibold text-sm hover:underline">
-                          Open Edit Pages (Tabs)
-                        </button> */}
                         <button onClick={() => saveSingleForm('MPG')} disabled={saving} className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition disabled:opacity-50">
                           Save This Guarantee
                         </button>
@@ -1323,7 +1285,7 @@ export default function GuaranteesDashboard() {
                   </button>
                 </div>
               )}
-              
+
 
               {/* Master Save Button */}
               {(formTbg || formMpg || formPbg) && (
