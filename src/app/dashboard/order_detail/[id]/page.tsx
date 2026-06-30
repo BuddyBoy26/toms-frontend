@@ -190,6 +190,8 @@ export default function OrderDetailEditPage() {
         orderRes.json(), tcRes.json(), tenderRes.json(), compRes.json(), prodRes.json(), oldOrdersRes.json()
       ])
 
+      console.log(orderData)
+
       const companiesArr: Company[] = Array.isArray(companyData) ? companyData : []
       const tendersArr: Tender[] = Array.isArray(tenderData) ? tenderData : []
       const productsArr: Product[] = Array.isArray(productData) ? productData : []

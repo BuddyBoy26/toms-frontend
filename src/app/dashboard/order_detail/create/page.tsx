@@ -16,7 +16,7 @@ interface TenderingCompany {
   tender_no?: string
   tender_description?: string
   tender_value: number | null
-  tendering_currency: CurrencyEnum
+  tendering_currency_nq: CurrencyEnum
 }
 
 interface Company {
@@ -218,7 +218,7 @@ export default function OrderDetailCreatePage() {
           company_id: selectedTC.company_id,
           tender_id: selectedTC.tender_id,
           order_value: formatNumber(totalAfterDiscount),
-          currency: selectedTC.tendering_currency,
+          currency: selectedTC.tendering_currency_nq,
         })
       } catch (error) {
         console.error('Error fetching tender company items:', error)
@@ -229,7 +229,7 @@ export default function OrderDetailCreatePage() {
           company_id: selectedTC.company_id,
           tender_id: selectedTC.tender_id,
           order_value: selectedTC.tender_value ? formatNumber(selectedTC.tender_value) : '',
-          currency: selectedTC.tendering_currency,
+          currency: selectedTC.tendering_currency_nq,
         })
       }
     }
