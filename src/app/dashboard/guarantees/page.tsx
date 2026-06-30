@@ -734,7 +734,7 @@ export default function GuaranteesDashboard() {
                             <td className="px-2 py-2"><input type="text" value={row.pg_bank_or_deposit === 0 ? row.pg_issuing_bank : row.pg_deposit_receipt_no} onChange={(e) => handleGridRowChange('PBG', index, row.pg_bank_or_deposit === 0 ? 'issuing_bank' : 'deposit_receipt_no', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="text" value={formatNumber(row.guarantee_value || '')} onChange={(e) => handleGridRowChange('PBG', index, 'guarantee_value', formatNumber(e.target.value))} className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.pbg_date || ''} onChange={(e) => handleGridRowChange('PBG', index, 'pbg_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="date" value={row.pg_submitted_date || ''} onChange={(e) => handleGridRowChange('PBG', index, 'submitted_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="date" value={row.pg_submitted_date || ''} onChange={(e) => handleGridRowChange('PBG', index, 'pg_submitted_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.expiry_date || ''} onChange={(e) => handleGridRowChange('PBG', index, 'expiry_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.pg_release_date_dewa || ''} onChange={(e) => handleGridRowChange('PBG', index, 'release_date_dewa', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.pg_release_date_bank || ''} onChange={(e) => handleGridRowChange('PBG', index, 'release_date_bank', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
@@ -1014,9 +1014,9 @@ export default function GuaranteesDashboard() {
                       </div>
 
                       <div className="flex justify-end items-center gap-4 pt-4 border-t border-gray-200">
-                        <button onClick={() => openEditTabs('TBG', formTbg.id, formTbg.cg_id, formTbg.isNewCG)} className="text-blue-600 hover:text-blue-800 font-semibold text-sm hover:underline">
+                        {/* <button onClick={() => openEditTabs('TBG', formTbg.id, formTbg.cg_id, formTbg.isNewCG)} className="text-blue-600 hover:text-blue-800 font-semibold text-sm hover:underline">
                           Open Edit Pages (Tabs)
-                        </button>
+                        </button> */}
                         <button onClick={() => saveSingleForm('TBG')} disabled={saving} className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50">
                           Save This Guarantee
                         </button>
@@ -1073,7 +1073,7 @@ export default function GuaranteesDashboard() {
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">Submitted Date</label>
-                          <input type="date" value={formPbg.submitted_date || ''} onChange={(e) => handleFormChange('PBG', 'submitted_date', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                          <input type="date" value={formPbg.pg_submitted_date || ''} onChange={(e) => handleFormChange('PBG', 'pg_submitted_date', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">DEWA Release</label>
@@ -1157,9 +1157,9 @@ export default function GuaranteesDashboard() {
                       </div>
 
                       <div className="flex justify-end items-center gap-4 pt-4 border-t border-gray-200">
-                        <button onClick={() => openEditTabs('PBG', formPbg.id, formPbg.cg_id, formPbg.isNewCG)} className="text-purple-600 hover:text-purple-800 font-semibold text-sm hover:underline">
+                        {/* <button onClick={() => openEditTabs('PBG', formPbg.id, formPbg.cg_id, formPbg.isNewCG)} className="text-purple-600 hover:text-purple-800 font-semibold text-sm hover:underline">
                           Open Edit Pages (Tabs)
-                        </button>
+                        </button> */}
                         <button onClick={() => saveSingleForm('PBG')} disabled={saving} className="px-6 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition disabled:opacity-50">
                           Save This Guarantee
                         </button>
@@ -1194,10 +1194,10 @@ export default function GuaranteesDashboard() {
                     <>
                       <h3 className="text-sm font-bold text-gray-700 mb-3 uppercase tracking-wider">MPG Details</h3>
                       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
-                        <div>
+                        {/* <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">Participated</label>
                           <select value={formMpg.participated} onChange={(e) => handleFormChange('MPG', 'participated', Number(e.target.value))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"><option value="0">No</option><option value="1">Yes</option></select>
-                        </div>
+                        </div> */}
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">Type</label>
                           <select value={formMpg.bank_or_deposit} onChange={(e) => handleFormChange('MPG', 'bank_or_deposit', Number(e.target.value))} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500"><option value="0">Bank</option><option value="1">Deposit</option></select>
@@ -1220,7 +1220,7 @@ export default function GuaranteesDashboard() {
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">Submitted Date</label>
-                          <input type="date" value={formMpg.submitted_date || ''} onChange={(e) => handleFormChange('MPG', 'submitted_date', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
+                          <input type="date" value={formMpg.mpg_submitted_date || ''} onChange={(e) => handleFormChange('MPG', 'mpg_submitted_date', e.target.value)} className="w-full px-3 py-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-green-500" />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-gray-700 mb-1">DEWA Release</label>
@@ -1304,9 +1304,9 @@ export default function GuaranteesDashboard() {
                       </div>
 
                       <div className="flex justify-end items-center gap-4 pt-4 border-t border-gray-200">
-                        <button onClick={() => openEditTabs('MPG', formMpg.id, formMpg.cg_id, formMpg.isNewCG)} className="text-green-600 hover:text-green-800 font-semibold text-sm hover:underline">
+                        {/* <button onClick={() => openEditTabs('MPG', formMpg.id, formMpg.cg_id, formMpg.isNewCG)} className="text-green-600 hover:text-green-800 font-semibold text-sm hover:underline">
                           Open Edit Pages (Tabs)
-                        </button>
+                        </button> */}
                         <button onClick={() => saveSingleForm('MPG')} disabled={saving} className="px-6 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition disabled:opacity-50">
                           Save This Guarantee
                         </button>

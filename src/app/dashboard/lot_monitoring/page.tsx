@@ -576,9 +576,9 @@ export default function LotMonitoringPage() {
       const x = (updatedLots[lotIndex].accessories_delay_days || 0) - (updatedLots[lotIndex].delay_by_dewa || 0) - (updatedLots[lotIndex].other_delay_by_dewa || 0)
       updatedLots[lotIndex].ld_delay_units = x > 0 ? x : 0
     }
-    if (updatedLots[lotIndex].actual_delay_for_ld) {
-      updatedLots[lotIndex].actual_ld_amount = (updatedLots[lotIndex].actual_delay_for_ld) / 7 * 0.0125 * (updatedLots[lotIndex].item_total_value)
-      updatedLots[lotIndex].max_ld_amount = 0.1 * (updatedLots[lotIndex].item_total_value)
+    if (updatedLots[lotIndex].actual_delay_for_ld || field=="force_majeure_days" || field == "force_majeure" ) {
+      updatedLots[lotIndex].actual_ld_amount = updatedLots[lotIndex].actual_delay_for_ld ? (updatedLots[lotIndex].actual_delay_for_ld) / 7 * 0.0125 * (updatedLots[lotIndex].item_total_value) : 0
+      updatedLots[lotIndex].max_ld_amount = updatedLots[lotIndex].actual_delay_for_ld ? 0.1 * (updatedLots[lotIndex].item_total_value) : 0
       updatedLots[lotIndex].chargeable_ld_amount = updatedLots[lotIndex].actual_ld_amount < updatedLots[lotIndex].max_ld_amount ? updatedLots[lotIndex].actual_ld_amount : updatedLots[lotIndex].max_ld_amount
     }
 

@@ -157,7 +157,7 @@ export default function PGEditPage() {
       })
 
       if (response.ok) {
-        router.push('/dashboard/performance_guarantee')
+        router.push('/dashboard/guarantees')
       } else {
         const err = await response.json().catch(() => null)
         setError(err?.detail || 'Failed to update PG')
@@ -418,7 +418,7 @@ export default function PGEditPage() {
         <div className="flex justify-end gap-3 pt-4">
           <button
             type="button"
-            onClick={() => router.push('/dashboard/performance_guarantee')}
+            onClick={() => router.push('/dashboard/guarantees')}
             className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition"
           >
             Cancel
