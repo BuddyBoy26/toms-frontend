@@ -369,6 +369,7 @@ export default function GuaranteesDashboard() {
       gPayload.mpg_issuing_bank = payloadSource.issuing_bank || payloadSource.mpg_issuing_bank || null
       gPayload.mpg_deposit_receipt_no = payloadSource.deposit_receipt_no || payloadSource.mpg_deposit_receipt_no || null
       gPayload.mpg_value = parseFormattedNumber(payloadSource.guarantee_value || payloadSource.mpg_value)
+      gPayload.mpg_date = payloadSource.mpg_date || null
       gPayload.mpg_expiry_date = payloadSource.expiry_date || payloadSource.mpg_expiry_date || null
       gPayload.mpg_submitted_date = payloadSource.submitted_date || payloadSource.mpg_submitted_date || null
       gPayload.mpg_release_date_dewa = payloadSource.release_date_dewa || payloadSource.mpg_release_date_dewa || null
@@ -708,7 +709,7 @@ export default function GuaranteesDashboard() {
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Bank / Receipt No</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Value</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">PBG Date</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">PBG Date</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Submitted Date</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Expiry Date</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">DEWA Release</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Bank Release</th>
@@ -793,8 +794,9 @@ export default function GuaranteesDashboard() {
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Type</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Bank / Receipt No</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Value</th>
-                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Expiry Date</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">MPG Date</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Submitted</th>
+                          <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Expiry Date</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">DEWA Release</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Bank Release</th>
                           <th className="px-2 py-2 text-left text-xs font-medium text-gray-700 uppercase">Extension Dates</th>
@@ -819,8 +821,9 @@ export default function GuaranteesDashboard() {
                             <td className="px-2 py-2"><select value={row.mpg_bank_or_deposit} onChange={(e) => handleGridRowChange('MPG', index, 'mpg_bank_or_deposit', Number(e.target.value))} className="w-20 px-2 py-1 text-xs border border-gray-300 rounded"><option value="0">Bank</option><option value="1">Deposit</option></select></td>
                             <td className="px-2 py-2"><input type="text" value={row.mpg_bank_or_deposit === 0 ? row.mpg_issuing_bank : row.mpg_deposit_receipt_no} onChange={(e) => handleGridRowChange('MPG', index, row.mpg_bank_or_deposit === 0 ? 'mpg_issuing_bank' : 'mpg_deposit_receipt_no', e.target.value)} className="w-28 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="text" value={formatNumber(row.guarantee_value || '')} onChange={(e) => handleGridRowChange('MPG', index, 'guarantee_value', formatNumber(e.target.value))} className="w-24 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
-                            <td className="px-2 py-2"><input type="date" value={row.expiry_date || ''} onChange={(e) => handleGridRowChange('MPG', index, 'expiry_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="date" value={row.mpg_date || ''} onChange={(e) => handleGridRowChange('MPG', index, 'mpg_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.mpg_submitted_date || ''} onChange={(e) => handleGridRowChange('MPG', index, 'mpg_submitted_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
+                            <td className="px-2 py-2"><input type="date" value={row.expiry_date || ''} onChange={(e) => handleGridRowChange('MPG', index, 'expiry_date', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.mpg_release_date_dewa || ''} onChange={(e) => handleGridRowChange('MPG', index, 'mpg_release_date_dewa', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="date" value={row.mpg_release_date_bank || ''} onChange={(e) => handleGridRowChange('MPG', index, 'mpg_release_date_bank', e.target.value)} className="w-26 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
                             <td className="px-2 py-2"><input type="text" value={row.mpg_extension_dates || ''} onChange={(e) => handleGridRowChange('MPG', index, 'mpg_extension_dates', e.target.value)} placeholder="YYYY-MM-DD, ..." className="w-32 px-2 py-1 text-xs border border-gray-300 rounded focus:ring-1 focus:ring-green-500" /></td>
