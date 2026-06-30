@@ -16,6 +16,7 @@ interface OrderDetail {
   order_description: string
   kka_commission_percent: number
   order_date: string
+  po_commencemnt_date: string
 }
 interface OrderItemDetail {
   order_item_detail_id: number
@@ -404,8 +405,8 @@ export default function LotMonitoringPage() {
 
     if (field === 'weeks') {
       const selectedOrder = orders.find(o => o.order_id === updatedLots[lotIndex].order_id)
-      if (selectedOrder?.order_date && value) {
-        const orderDate = new Date(selectedOrder.order_date)
+      if (selectedOrder?.po_commencemnt_date && value) {
+        const orderDate = new Date(selectedOrder.po_commencemnt_date)
         orderDate.setDate(orderDate.getDate() + (Number(value) * 7))
         const cdd = orderDate.toISOString().split('T')[0]
         updatedLots[lotIndex].contractual_delivery_date = cdd
@@ -751,6 +752,8 @@ export default function LotMonitoringPage() {
         chargeable_ld_amount: toDecimal(lot.chargeable_ld_amount),
       }
 
+      console.log(payload)
+
       const url = isNewLot
         ? `${API}/lot_monitoring`
         : `${API}/lot_monitoring/${lot.lot_id}`
@@ -894,8 +897,8 @@ export default function LotMonitoringPage() {
           </div>
           {selectedOrderId !== '' && (() => {
             const selectedOrder = orders.find(o => o.order_id === selectedOrderId)
-            if (!selectedOrder?.order_date) return null
-            const [y, m, d] = selectedOrder.order_date.split('-')
+            if (!selectedOrder?.po_commencemnt_date) return null
+            const [y, m, d] = selectedOrder.po_commencemnt_date.split('-')
             return (
               <div className="pb-0.5">
                 <p className="text-xs text-gray-500 mb-1">PO Commencement Date</p>
